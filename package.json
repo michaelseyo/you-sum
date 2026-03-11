@@ -1,0 +1,14 @@
+{
+  "name": "you-sum",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace apps/api run dev",
+    "dev:extension": "echo \"Load apps/extension as an unpacked extension in Chrome\"",
+    "lint": "echo \"Add linting once the stack is chosen\""
+  }
+}
