@@ -12,12 +12,12 @@ async function getVideoContext(tabId) {
 }
 
 async function summarizeVideo(videoId) {
-  const response = await fetch("http://localhost:8787/summarize", {
+  const response = await fetch("http://localhost:3000/summarize", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify({ videoId })
+    body: JSON.stringify({ videoId }),
   });
 
   if (!response.ok) {

@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:api": "pnpm --filter @you-sum/api dev",
+    "dev:api": "pnpm --filter @you-sum/api start:dev",
     "dev:extension": "echo \"Load apps/extension as an unpacked extension in Chrome\"",
     "lint": "echo \"Add linting once the stack is chosen\""
   }
