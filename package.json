@@ -3,12 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@10.17.0",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "dev:api": "pnpm --filter @you-sum/api start:dev",
     "dev:extension": "echo \"Load apps/extension as an unpacked extension in Chrome\"",
     "lint": "echo \"Add linting once the stack is chosen\""
   }
