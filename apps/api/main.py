@@ -2,7 +2,7 @@ import logging
 
 from app.schemas.summarize import SummarizeRequest, SummarizeResponse
 from app.services.transcription import fetch_transcript_text
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 logging.basicConfig(level=logging.INFO)
