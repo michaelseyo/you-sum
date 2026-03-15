@@ -47,7 +47,7 @@ summarizeButton.addEventListener("click", async () => {
     statusEl.textContent = `Summarizing ${context.videoId}...`;
     const data = await summarizeVideo(context.videoId);
 
-    resultEl.textContent = JSON.stringify(data.summary, null, 2);
+    resultEl.textContent = data.summary;
     statusEl.textContent = "Summary loaded";
   } catch (error) {
     statusEl.textContent = "Unable to summarize video";
