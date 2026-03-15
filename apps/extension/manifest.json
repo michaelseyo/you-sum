@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "You Sum",
+  "name": "Yousum",
   "version": "0.1.0",
   "description": "Summarize the current YouTube video.",
   "permissions": ["activeTab"],
   "host_permissions": ["https://www.youtube.com/*", "http://localhost:3000/*"],
   "action": {
-    "default_title": "You Sum",
+    "default_title": "Yousum",
     "default_popup": "src/popup/popup.html"
   },
   "background": {

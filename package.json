@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "packageManager": "pnpm@10.17.0",
   "scripts": {
+    "dev:api": "uv run --directory apps/api uvicorn main:app --reload",
     "dev:extension": "echo \"Load apps/extension as an unpacked extension in Chrome\"",
     "lint": "echo \"Add linting once the stack is chosen\""
   }

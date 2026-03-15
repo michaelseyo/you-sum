@@ -1,4 +1,14 @@
 {
-  "python-envs.pythonProjects": [],
-  "python-envs.defaultEnvManager": "ms-python.python:system"
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "python.defaultInterpreterPath": "${workspaceFolder}/apps/api/.venv/bin/python",
+  "python.analysis.autoImportCompletions": true,
+  "python-envs.defaultEnvManager": "ms-python.python:venv",
+  "ruff.importStrategy": "fromEnvironment",
+  "isort.importStrategy": "fromEnvironment"
 }
