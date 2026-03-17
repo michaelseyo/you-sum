@@ -7,4 +7,5 @@ class SummarizeRequest(BaseModel):
 
 class SummarizeResponse(BaseModel):
     summary: str
-
+    cached: bool
+    prompt_version: str

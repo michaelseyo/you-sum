@@ -1,3 +1,6 @@
+SUMMARY_PROMPT_VERSION = "v1"
+
+
 SUMMARY_INSTRUCTIONS = (
     "You are a helpful assistant that summarizes YouTube video transcripts. "
     "Write a concise summary that captures the main ideas, key takeaways, and "

@@ -1,14 +1,19 @@
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
+from app.clients.db import get_db, init_db
 from app.clients.openai_client import create_openai_client
+from app.repositories.summaries_repository import SummariesRepository
+from app.repositories.transcripts_repository import TranscriptsRepository
 from app.schemas.summarize import SummarizeRequest, SummarizeResponse
 from app.services.summary import SummaryService
-from app.services.transcript import fetch_transcript_text
-from fastapi import FastAPI, HTTPException
+from app.services.summarize_orchestrator import SummarizeOrchestrator
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from openai import APIStatusError, RateLimitError
+from sqlalchemy.orm import Session
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,8 +21,23 @@ logger = logging.getLogger(__name__)
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 summary_service = SummaryService(client=create_openai_client())
+transcripts_repository = TranscriptsRepository()
+summaries_repository = SummariesRepository()
+summarize_orchestrator = SummarizeOrchestrator(
+    summary_service=summary_service,
+    transcripts_repository=transcripts_repository,
+    summaries_repository=summaries_repository,
+)
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Initialize the local cache schema before the API starts serving requests
+    init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,11 +56,12 @@ async def root():
 @app.post("/summarize", response_model=SummarizeResponse)
 async def summarize(
     payload: SummarizeRequest,
+    db: Session = Depends(get_db),
 ) -> SummarizeResponse:
     logger.info("Summarize requested for video_id=%s", payload.video_id)
-    transcript_text = fetch_transcript_text(video_id=payload.video_id)
     try:
-        summary_text = await summary_service.summarize_transcript(transcript_text)
+        # Keep the route thin and delegate cache-or-generate logic to the orchestrator
+        result = await summarize_orchestrator.summarize_video(db, payload.video_id)
     except RateLimitError as exc:
         logger.warning("OpenAI rate limit or quota issue: %s", exc)
         raise HTTPException(
@@ -60,4 +81,8 @@ async def summarize(
             detail="Summary generation failed unexpectedly.",
         ) from exc
 
-    return SummarizeResponse(summary=summary_text)
+    return SummarizeResponse(
+        summary=result.summary,
+        cached=result.cached,
+        prompt_version=result.prompt_version,
+    )
