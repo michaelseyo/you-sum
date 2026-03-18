@@ -24,7 +24,7 @@ class Transcript(Base):
     )
 
     # A transcript can have multiple summary variants across models and prompt versions
-    summaries: Mapped[list["Summary"]] = relationship(
+    summaries: Mapped[list["Summary"]] = relationship(  # noqa: F821
         back_populates="transcript",
         cascade="all, delete-orphan",
     )

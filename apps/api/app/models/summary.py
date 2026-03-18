@@ -9,9 +9,7 @@ class Summary(Base):
     """Stored summary for one transcript, model, and prompt version."""
 
     __tablename__ = "summaries"
-    __table_args__ = (
-        UniqueConstraint("transcript_id", "model", "prompt_version"),
-    )
+    __table_args__ = (UniqueConstraint("transcript_id", "model", "prompt_version"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     transcript_id: Mapped[int] = mapped_column(
@@ -31,4 +29,4 @@ class Summary(Base):
     )
 
     # Link each summary variant back to the transcript it was generated from
-    transcript: Mapped["Transcript"] = relationship(back_populates="summaries")
+    transcript: Mapped["Transcript"] = relationship(back_populates="summaries")  # noqa: F821
