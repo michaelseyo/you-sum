@@ -9,6 +9,5 @@
   "python.defaultInterpreterPath": "${workspaceFolder}/apps/api/.venv/bin/python",
   "python.analysis.autoImportCompletions": true,
   "python-envs.defaultEnvManager": "ms-python.python:venv",
-  "ruff.importStrategy": "fromEnvironment",
-  "isort.importStrategy": "fromEnvironment"
+  "ruff.importStrategy": "fromEnvironment"
 }
