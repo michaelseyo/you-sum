@@ -57,8 +57,7 @@ class SummarizeOrchestrator:
         else:
             logger.info("Transcript cache hit for video_id=%s", video_id)
             self.transcripts_repository.update_last_accessed(
-                db,
-                transcript_id=transcript.id
+                db, transcript_id=transcript.id
             )
 
         # Summary reuse depends on the stored transcript plus the active model and prompt version

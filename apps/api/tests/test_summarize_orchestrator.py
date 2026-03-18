@@ -111,7 +111,9 @@ class SummarizeOrchestratorTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(summary_service.calls, 1)
         self.assertEqual(fetch_mock.call_count, 1)
 
-    async def test_reuses_stored_transcript_and_cached_summary_on_repeat_request(self) -> None:
+    async def test_reuses_stored_transcript_and_cached_summary_on_repeat_request(
+        self,
+    ) -> None:
         summary_service = FakeSummaryService()
         transcripts_repository = InMemoryTranscriptsRepository()
         summaries_repository = InMemorySummariesRepository()

@@ -10,4 +10,3 @@ def create_openai_client() -> AsyncOpenAI:
         raise RuntimeError("OPENAI_API_KEY is not set")
 
     return AsyncOpenAI(api_key=api_key)
-
