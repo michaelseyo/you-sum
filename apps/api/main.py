@@ -7,11 +7,11 @@ from app.clients.openai_client import create_openai_client
 from app.repositories.summaries_repository import SummariesRepository
 from app.repositories.transcripts_repository import TranscriptsRepository
 from app.schemas.summarize import SummarizeRequest, SummarizeResponse
-from app.services.summary import SummaryService
 from app.services.summarize_orchestrator import SummarizeOrchestrator
+from app.services.summary import SummaryService
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 from openai import APIStatusError, RateLimitError
 from sqlalchemy.orm import Session
 
@@ -32,7 +32,7 @@ summarize_orchestrator = SummarizeOrchestrator(
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Initialize the local cache schema before the API starts serving requests
+    # Ensure the database schema exists before serving requests
     init_db()
     yield
 
