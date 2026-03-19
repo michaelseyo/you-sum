@@ -4,6 +4,7 @@ from pathlib import Path
 
 from app.clients.db import get_db, init_db
 from app.clients.openai_client import create_openai_client
+from app.config import get_allowed_origin_regex, get_allowed_origins
 from app.repositories.summaries_repository import SummariesRepository
 from app.repositories.transcripts_repository import TranscriptsRepository
 from app.schemas.summarize import SummarizeRequest, SummarizeResponse
@@ -41,7 +42,8 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"chrome-extension://.*",
+    allow_origins=get_allowed_origins(),
+    allow_origin_regex=get_allowed_origin_regex() or r"chrome-extension://.*",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

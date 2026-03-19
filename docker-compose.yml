@@ -1,0 +1,43 @@
+services:
+  api:
+    build:
+      # Build the API image from the app source folder
+      context: ./apps/api
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        # Wait until Postgres is actually ready for connections
+        condition: service_healthy
+    environment:
+      # Use the postgres service name as the database host inside Compose
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/yousum
+      # Read the API key from your shell environment
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      ALLOWED_ORIGIN_REGEX: ${ALLOWED_ORIGIN_REGEX:-chrome-extension://.*}
+      PORT: 8000
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: yousum
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      # Ask Postgres if it is ready to accept connections
+      test: ["CMD-SHELL", "pg_isready -U postgres -d yousum"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Keep database files in a named Docker volume
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  # Named volume that persists Postgres data across container restarts
+  postgres_data:

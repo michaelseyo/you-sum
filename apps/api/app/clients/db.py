@@ -1,6 +1,6 @@
-import os
 from collections.abc import Generator
 
+from app.config import get_database_url as get_configured_database_url
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -15,11 +15,7 @@ class Base(DeclarativeBase):
 
 def get_database_url() -> str:
     """Return the configured database URL for the current environment."""
-    database_url = os.getenv("DATABASE_URL")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL is not set")
-
-    return database_url
+    return get_configured_database_url()
 
 
 def _engine_options(database_url: str) -> dict:

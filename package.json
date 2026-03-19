@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "packageManager": "pnpm@10.17.0",
   "scripts": {
-    "dev:api": "uv run --directory apps/api uvicorn main:app --reload",
+    "dev:api": "docker compose up --build",
+    "down:api": "docker compose down",
+    "dev-api-direct": "uv run --directory apps/api uvicorn main:app --reload",
     "lint:api": "uv run --directory apps/api ruff check",
     "check:api": "uv run --directory apps/api ruff check && uv run --directory apps/api ruff format --check",
     "fix:api": "uv run --directory apps/api ruff check --fix && uv run --directory apps/api ruff format",
