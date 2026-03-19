@@ -20,6 +20,11 @@ def get_openai_api_key() -> str:
     return get_required_env("OPENAI_API_KEY")
 
 
+def get_openai_model() -> str:
+    """Return the configured OpenAI model for summary generation."""
+    return os.getenv("OPENAI_MODEL", "gpt-5-mini")
+
+
 def get_allowed_origins() -> list[str]:
     """Parse a comma-separated allowlist of exact CORS origins."""
     raw_value = os.getenv("ALLOWED_ORIGINS", "")

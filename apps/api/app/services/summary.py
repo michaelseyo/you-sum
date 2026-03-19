@@ -1,5 +1,4 @@
-import os
-
+from app.config import get_openai_model
 from app.prompts.summarize import SUMMARY_INSTRUCTIONS, build_summary_prompt
 from openai import AsyncOpenAI
 
@@ -7,7 +6,7 @@ from openai import AsyncOpenAI
 class SummaryService:
     def __init__(self, client: AsyncOpenAI) -> None:
         self.client = client
-        self.model = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+        self.model = get_openai_model()
 
     async def summarize_transcript(self, transcript_text: str) -> str:
         prompt = build_summary_prompt(transcript_text)
