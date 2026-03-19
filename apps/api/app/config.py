@@ -32,6 +32,6 @@ def get_allowed_origins() -> list[str]:
 
 
 def get_allowed_origin_regex() -> str | None:
-    """Return an optional regex for allowed origins such as extension IDs."""
+    """Return the regex used for allowed origins such as extension IDs."""
     raw_value = os.getenv("ALLOWED_ORIGIN_REGEX", "").strip()
     return raw_value or None

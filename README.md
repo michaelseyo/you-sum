@@ -28,6 +28,8 @@ The stack starts:
 
 The Compose setup uses a separate Postgres container and persists data in the `postgres_data` Docker volume. The API connects to Postgres through `DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/yousum`.
 
+For local extension development, Docker Compose defaults `ALLOWED_ORIGIN_REGEX` to `chrome-extension://.*` so an unpacked extension can call the API without extra setup.
+
 If those host ports are already taken on your machine, override them when starting Compose:
 
 ```bash
@@ -72,10 +74,10 @@ Optional CORS controls:
 
 ```bash
 ALLOWED_ORIGINS=http://localhost:3000,chrome-extension://<your-extension-id>
-ALLOWED_ORIGIN_REGEX=chrome-extension://.*
+ALLOWED_ORIGIN_REGEX=chrome-extension://<your-extension-id>
 ```
 
-`ALLOWED_ORIGIN_REGEX` defaults to `chrome-extension://.*` if you do not set it, which keeps extension development simple. In production, prefer tightening this to your real extension ID once it is stable.
+`ALLOWED_ORIGIN_REGEX` is opt-in for production. Set it explicitly when you want to allow a specific extension origin.
 
 ### Deploy the API
 

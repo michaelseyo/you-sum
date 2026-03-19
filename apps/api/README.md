@@ -12,7 +12,7 @@ Optional:
 ```bash
 OPENAI_MODEL=gpt-5-mini
 ALLOWED_ORIGINS=http://localhost:3000,chrome-extension://<your-extension-id>
-ALLOWED_ORIGIN_REGEX=chrome-extension://.*
+ALLOWED_ORIGIN_REGEX=chrome-extension://<your-extension-id>
 ```
 
 ## Docker Compose Run
@@ -36,6 +36,8 @@ Compose uses:
 - API on `http://localhost:8000`
 - Postgres on `localhost:5432`
 - `DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/yousum`
+
+For local extension development, Compose defaults `ALLOWED_ORIGIN_REGEX` to `chrome-extension://.*`.
 
 If your host already uses those ports, override them when starting Compose:
 
