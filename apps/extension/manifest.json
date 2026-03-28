@@ -3,8 +3,12 @@
   "name": "Yousum",
   "version": "0.1.0",
   "description": "Summarize the current YouTube video.",
-  "permissions": ["activeTab"],
-  "host_permissions": ["https://www.youtube.com/*", "http://localhost:3000/*"],
+  "permissions": ["activeTab", "identity", "storage"],
+  "host_permissions": ["https://www.youtube.com/*", "http://localhost:8000/*"],
+  "oauth2": {
+    "client_id": "253061236495-p8hohm7sna23d0fc8pgkut5c3mornbas.apps.googleusercontent.com",
+    "scopes": ["openid", "email", "profile"]
+  },
   "action": {
     "default_title": "Yousum",
     "default_popup": "src/popup/popup.html"

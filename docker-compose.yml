@@ -9,11 +9,16 @@ services:
         # Wait until Postgres is actually ready for connections
         condition: service_healthy
     environment:
-      # Use the postgres service name as the database host inside Compose
+      # Local Docker Compose database URL using the postgres service name and dev-only credentials
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/yousum
       # Read the API key from your shell environment
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
+      APP_JWT_EXPIRES_MINUTES: ${APP_JWT_EXPIRES_MINUTES:-60}
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS}
+      ENABLE_DEV_LOGIN: ${ENABLE_DEV_LOGIN:-false}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       ALLOWED_ORIGIN_REGEX: ${ALLOWED_ORIGIN_REGEX:-chrome-extension://.*}
       PORT: 8000

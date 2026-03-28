@@ -5,9 +5,14 @@ from pathlib import Path
 from app.clients.db import get_db, init_db
 from app.clients.openai_client import create_openai_client
 from app.config import get_allowed_origin_regex, get_allowed_origins
+from app.dependencies.auth import auth_service, get_current_user
+from app.helpers.auth import build_user_response
 from app.repositories.summaries_repository import SummariesRepository
 from app.repositories.transcripts_repository import TranscriptsRepository
+from app.schemas.auth import (AuthResponse, CurrentUserResponse,
+                              DevLoginRequest, GoogleAuthRequest)
 from app.schemas.summarize import SummarizeRequest, SummarizeResponse
+from app.services.auth import AuthenticationError, AuthorizationError
 from app.services.summarize_orchestrator import SummarizeOrchestrator
 from app.services.summary import SummaryService
 from dotenv import load_dotenv
@@ -52,15 +57,73 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
+    logger.info("Root health check requested")
     return {"message": "Hello World"}
+
+
+@app.post("/auth/google", response_model=AuthResponse)
+async def authenticate_with_google(
+    payload: GoogleAuthRequest,
+    db: Session = Depends(get_db),
+) -> AuthResponse:
+    logger.info("Google auth requested")
+    try:
+        user = auth_service.authenticate_google_user(db, payload.id_token)
+    except AuthorizationError as exc:
+        logger.warning("Google auth rejected: %s", exc)
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except AuthenticationError as exc:
+        logger.warning("Google auth failed authentication: %s", exc)
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+    logger.info("Google auth succeeded for email=%s user_id=%s", user.email, user.id)
+    return AuthResponse(
+        access_token=auth_service.issue_access_token(user),
+        token_type="bearer",
+        user=build_user_response(user),
+    )
+
+
+if auth_service.dev_login_enabled:
+
+    @app.post("/auth/dev-login", response_model=AuthResponse)
+    async def dev_login(
+        payload: DevLoginRequest,
+        db: Session = Depends(get_db),
+    ) -> AuthResponse:
+        logger.info("Dev login requested for email=%s", payload.email or "<default>")
+        try:
+            user = auth_service.authenticate_dev_user(db, payload.email)
+        except AuthenticationError as exc:
+            logger.warning("Dev login failed authentication: %s", exc)
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+        logger.info("Dev login succeeded for email=%s user_id=%s", user.email, user.id)
+        return AuthResponse(
+            access_token=auth_service.issue_access_token(user),
+            token_type="bearer",
+            user=build_user_response(user),
+        )
+
+
+@app.get("/me", response_model=CurrentUserResponse)
+async def me(current_user=Depends(get_current_user)) -> CurrentUserResponse:
+    logger.info("Current user requested for email=%s user_id=%s", current_user.email, current_user.id)
+    return CurrentUserResponse(user=build_user_response(current_user))
 
 
 @app.post("/summarize", response_model=SummarizeResponse)
 async def summarize(
     payload: SummarizeRequest,
+    current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> SummarizeResponse:
-    logger.info("Summarize requested for video_id=%s", payload.video_id)
+    logger.info(
+        "Summarize requested for video_id=%s by email=%s user_id=%s",
+        payload.video_id,
+        current_user.email,
+        current_user.id,
+    )
     try:
         # Keep the route thin and delegate cache-or-generate logic to the orchestrator
         result = await summarize_orchestrator.summarize_video(db, payload.video_id)
@@ -83,6 +146,14 @@ async def summarize(
             detail="Summary generation failed unexpectedly.",
         ) from exc
 
+    logger.info(
+        "Summarize completed for video_id=%s by email=%s user_id=%s cached=%s prompt_version=%s",
+        payload.video_id,
+        current_user.email,
+        current_user.id,
+        result.cached,
+        result.prompt_version,
+    )
     return SummarizeResponse(
         summary=result.summary,
         cached=result.cached,

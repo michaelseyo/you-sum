@@ -5,21 +5,29 @@
 ```bash
 OPENAI_API_KEY=your-openai-api-key
 DATABASE_URL=postgresql+psycopg://user:password@host:5432/yousum
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+APP_JWT_SECRET=change-me-to-a-long-random-string
+APP_JWT_EXPIRES_MINUTES=60
+ALLOWED_EMAILS=you@example.com,teammate@example.com
 ```
 
 Optional:
 
 ```bash
 OPENAI_MODEL=gpt-5-mini
+ENABLE_DEV_LOGIN=false
 ALLOWED_ORIGINS=http://localhost:3000,chrome-extension://<your-extension-id>
 ALLOWED_ORIGIN_REGEX=chrome-extension://<your-extension-id>
 ```
+
+`ENABLE_DEV_LOGIN` should only be enabled for local development.
+`ALLOWED_EMAILS` accepts a comma-separated list when you want to allow multiple accounts.
 
 ## Docker Compose Run
 
 Docker Compose is the standard local development workflow.
 
-Copy the repo root `.env.example` to `.env`, then fill in `OPENAI_API_KEY`.
+Copy the repo root `.env.example` to `.env`, then fill in the OpenAI and Google auth values.
 
 ```bash
 cp .env.example .env

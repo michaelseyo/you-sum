@@ -73,5 +73,6 @@ def init_db() -> None:
     """Create all ORM tables for the current database URL."""
     from app.models.summary import Summary  # noqa: F401
     from app.models.transcript import Transcript  # noqa: F401
+    from app.models.user import User  # noqa: F401
 
     Base.metadata.create_all(bind=get_engine())

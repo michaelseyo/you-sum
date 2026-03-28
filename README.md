@@ -12,7 +12,7 @@ FastAPI backend for summarizing YouTube videos, with a Chrome extension client i
 Docker Compose is the standard local development workflow for the API.
 
 1. Copy `.env.example` to `.env` at the repo root
-2. Fill in at least `OPENAI_API_KEY` in that root `.env`
+2. Fill in the auth and API settings in that root `.env`
 3. Start the local stack:
 
 ```bash
@@ -68,16 +68,24 @@ Recommended first pass:
 ```bash
 OPENAI_API_KEY=your-openai-api-key
 DATABASE_URL=postgresql+psycopg://user:password@host:5432/yousum
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+APP_JWT_SECRET=change-me-to-a-long-random-string
+APP_JWT_EXPIRES_MINUTES=60
+ALLOWED_EMAILS=you@example.com,teammate@example.com
 ```
 
-Optional CORS controls:
+Optional runtime settings:
 
 ```bash
+OPENAI_MODEL=gpt-5-mini
+ENABLE_DEV_LOGIN=false
 ALLOWED_ORIGINS=http://localhost:3000,chrome-extension://<your-extension-id>
 ALLOWED_ORIGIN_REGEX=chrome-extension://<your-extension-id>
 ```
 
 `ALLOWED_ORIGIN_REGEX` is opt-in for production. Set it explicitly when you want to allow a specific extension origin.
+`ENABLE_DEV_LOGIN` should stay `false` outside local development.
+`ALLOWED_EMAILS` accepts a comma-separated list when you want to allow multiple accounts.
 
 ### Deploy the API
 
