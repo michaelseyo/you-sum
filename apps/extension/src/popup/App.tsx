@@ -1,12 +1,134 @@
-import { API_BASE_URL, ENV } from "../config/env";
+import { useEffect, useState } from "react";
+import { summarizeVideo } from "../lib/api";
+import {
+  getActiveTab,
+  getVideoContext,
+  sendRuntimeMessage,
+} from "../lib/chrome";
+import type { AuthState } from "../types/runtime";
 
 export function App() {
+  const [authState, setAuthState] = useState<AuthState | null>(null);
+  const [authStatus, setAuthStatus] = useState(
+    "Sign in with Google to use your backend.",
+  );
+  const [status, setStatus] = useState("Ready to summarize the current video.");
+  const [result, setResult] = useState("No summary yet.");
+
+  const signedIn = Boolean(authState?.accessToken);
+
+  useEffect(() => {
+    async function refreshAuthState() {
+      const response = await sendRuntimeMessage({ type: "AUTH_GET_STATE" });
+      if (!response.ok) {
+        throw new Error(response.error || "Unable to load auth state");
+      }
+
+      setAuthState(response.authState);
+      setAuthStatus(
+        response.authState?.accessToken
+          ? `Signed in as ${response.authState.user.email}`
+          : "Sign in with Google to use your backend.",
+      );
+    }
+
+    refreshAuthState().catch((error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Unable to load auth state";
+      setAuthStatus(message);
+      setAuthState(null);
+    });
+  }, []);
+
+  async function handleSignIn() {
+    try {
+      setAuthStatus("Signing in with Google...");
+      const response = await sendRuntimeMessage({ type: "AUTH_SIGN_IN" });
+      if (!response.ok) {
+        throw new Error(response.error || "Sign-in failed");
+      }
+      if (!response.authState) {
+        throw new Error("Sign-in did not return an auth state");
+      }
+
+      setAuthState(response.authState);
+      setAuthStatus(`Signed in as ${response.authState.user.email}`);
+    } catch (error: unknown) {
+      setAuthStatus(error instanceof Error ? error.message : "Sign-in failed");
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      const response = await sendRuntimeMessage({ type: "AUTH_SIGN_OUT" });
+      if (!response.ok) {
+        throw new Error(response.error || "Sign-out failed");
+      }
+
+      setAuthState(null);
+      setAuthStatus("Sign in with Google to use your backend.");
+      setStatus("Ready to summarize the current video.");
+      setResult("No summary yet.");
+    } catch (error: unknown) {
+      setAuthStatus(error instanceof Error ? error.message : "Sign-out failed");
+    }
+  }
+
+  async function handleSummarize() {
+    if (!authState?.accessToken) {
+      setStatus("Sign in before summarizing.");
+      return;
+    }
+
+    setStatus("Reading current tab...");
+    setResult("Loading...");
+
+    try {
+      const tab = await getActiveTab();
+
+      if (!tab?.id) {
+        throw new Error("No active tab found");
+      }
+
+      const context = await getVideoContext(tab.id);
+
+      if (!context.videoId) {
+        throw new Error("Open a YouTube video first");
+      }
+
+      setStatus(`Summarizing ${context.videoId}...`);
+      const data = await summarizeVideo(context.videoId, authState.accessToken);
+      setResult(data.summary);
+      setStatus("Summary loaded");
+    } catch (error: unknown) {
+      setStatus("Unable to summarize video");
+      setResult(
+        error instanceof Error ? error.message : "Unable to summarize video",
+      );
+    }
+  }
+
   return (
     <main className="popup">
       <h1>Yousum</h1>
-      <p className="status">Environment: {ENV}</p>
-      <p className="status">API: {API_BASE_URL}</p>
-      <pre>Extension migration scaffold in progress.</pre>
+      <p className="status">{authStatus}</p>
+      <p className="status">{status}</p>
+      <div className="auth-actions">
+        {!signedIn ? (
+          <button onClick={handleSignIn} type="button">
+            Sign in with Google
+          </button>
+        ) : null}
+        {signedIn ? (
+          <button className="secondary" onClick={handleSignOut} type="button">
+            Sign out
+          </button>
+        ) : null}
+      </div>
+      <button disabled={!signedIn} onClick={handleSummarize} type="button">
+        Summarize this video
+      </button>
+      <pre>{result}</pre>
     </main>
   );
 }
