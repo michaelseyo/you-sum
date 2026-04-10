@@ -1,37 +1,8 @@
 export type ExtensionEnv = "development" | "production";
 
-type ExtensionManifest = {
-  action: {
-    default_icon: Record<string, string>;
-    default_popup: string;
-    default_title: string;
-  };
-  background: {
-    service_worker: string;
-    type: "module";
-  };
-  content_scripts: Array<{
-    js: string[];
-    matches: string[];
-  }>;
-  description: string;
-  host_permissions: string[];
-  icons: Record<string, string>;
-  key?: string;
-  manifest_version: 3;
-  name: string;
-  oauth2: {
-    client_id: string;
-    scopes: string[];
-  };
-  permissions: string[];
-  version: string;
-};
-
 export type ExtensionBuildConfig = {
   apiBaseUrl: string;
-  env: ExtensionEnv;
-  manifest: ExtensionManifest;
+  manifest: chrome.runtime.ManifestV3;
 };
 
 function resolveEnv(mode: string): ExtensionEnv {
@@ -88,14 +59,13 @@ export function resolveExtensionBuildConfig(
 
   return {
     apiBaseUrl,
-    env,
     manifest: {
       manifest_version: 3,
       ...(extensionKey ? { key: extensionKey } : {}),
       name: extensionName,
       version: "0.1.0",
       description: "Summarize the current YouTube video.",
-      permissions: ["activeTab", "identity", "storage"],
+      permissions: ["activeTab", "identity", "storage", "sidePanel"],
       host_permissions: [
         "https://www.youtube.com/*",
         toHostPermission(apiBaseUrl),
@@ -111,6 +81,9 @@ export function resolveExtensionBuildConfig(
         },
         default_title: extensionName,
         default_popup: "index.html",
+      },
+      side_panel: {
+        default_path: "index.html",
       },
       icons: {
         "16": "assets/icon-16.png",
