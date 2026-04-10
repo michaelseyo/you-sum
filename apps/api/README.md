@@ -69,6 +69,12 @@ DATABASE_URL=sqlite+pysqlite:///./apps/api/yousum.db pnpm dev-api-direct
 
 `apps/api/.env.example` remains the API runtime env reference for direct runs and production setups.
 
+## Transcript Provider Limitation
+
+The current transcript fetch path uses `youtube-transcript-api` from the backend. This works for local development more reliably than cloud deployment. On cloud hosts, YouTube may block transcript requests from datacenter IP ranges, which can cause `/summarize` to fail even when the rest of the API is healthy.
+
+Treat the current transcript retrieval setup as local-development friendly rather than production-reliable.
+
 ## Production Run
 
 ```bash

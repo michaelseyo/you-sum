@@ -11,7 +11,10 @@
     "check:api": "uv run --directory apps/api ruff check && uv run --directory apps/api ruff format --check",
     "fix:api": "uv run --directory apps/api ruff check --fix && uv run --directory apps/api ruff format",
     "test:api": "uv run --directory apps/api python -m unittest discover -s tests -v",
-    "dev:extension": "echo \"Load apps/extension as an unpacked extension in Chrome\"",
+    "dev:extension": "pnpm --dir apps/extension dev",
+    "build:extension": "pnpm --dir apps/extension build",
+    "build-dev:extension": "pnpm --dir apps/extension build:dev",
+    "test:extension": "pnpm --dir apps/extension test",
     "lint": "echo \"Add linting once the stack is chosen\""
   }
 }

@@ -7,6 +7,16 @@ FastAPI backend for summarizing YouTube videos, with a Chrome extension client i
 - `apps/api`: FastAPI service that fetches transcripts, caches them, and generates summaries with OpenAI.
 - `apps/extension`: Manifest v3 Chrome extension client.
 
+## Current Production Caveat
+
+The current transcript retrieval flow relies on `youtube-transcript-api` running from the backend. That works for local development, but it can fail from cloud-hosted infrastructure because YouTube may block transcript requests coming from datacenter IP ranges.
+
+As a result:
+
+- local extension development is the primary supported workflow right now
+- production extension packaging works
+- production transcript fetching may still fail unless the transcript retrieval architecture changes
+
 ## API Local Development
 
 Docker Compose is the standard local development workflow for the API.
@@ -54,6 +64,58 @@ That fallback is no longer the default local workflow.
 
 `apps/api/.env.example` is still useful as the API runtime reference for direct runs and production configuration.
 
+## Extension Development
+
+The extension now builds through Vite and uses its own environment file.
+
+1. Copy `apps/extension/.env.example` to `apps/extension/.env`
+2. Fill in the extension-specific values:
+
+```bash
+EXTENSION_PUBLIC_KEY=your-chrome-extension-public-key
+EXTENSION_GOOGLE_CLIENT_ID=your-chrome-extension-client-id.apps.googleusercontent.com
+EXTENSION_DEV_API_BASE_URL=http://localhost:8000
+EXTENSION_PRODUCTION_API_BASE_URL=https://your-production-api.example.com
+```
+
+3. Start the API locally:
+
+```bash
+pnpm dev:api
+```
+
+4. Build the development extension:
+
+```bash
+pnpm build-dev:extension
+```
+
+5. Load the unpacked extension from:
+
+```text
+apps/extension/dist
+```
+
+in `chrome://extensions`
+
+### Extension commands
+
+- `pnpm dev:extension`
+  watch-mode development build for the extension
+- `pnpm build-dev:extension`
+  one-off development build to `apps/extension/dist`
+- `pnpm build:extension`
+  production build plus upload-ready zip output at `apps/extension/yousum-extension-prod.zip`
+- `pnpm test:extension`
+  extension test suite
+
+### Extension packaging notes
+
+- `apps/extension/.env` is the source of truth for extension build variables
+- `apps/extension/dist` is the folder to load locally in Chrome
+- `apps/extension/yousum-extension-prod.zip` is the archive to upload to the Chrome Web Store
+- the manifest `key` is sourced from `EXTENSION_PUBLIC_KEY` so the extension ID stays stable across builds
+
 ## Minimal API Deployment
 
 Use one hosted FastAPI service plus one managed Postgres database.
@@ -87,6 +149,10 @@ ALLOWED_ORIGIN_REGEX=chrome-extension://<your-extension-id>
 `ENABLE_DEV_LOGIN` should stay `false` outside local development.
 `ALLOWED_EMAILS` accepts a comma-separated list when you want to allow multiple accounts.
 
+### Important transcript limitation
+
+If you deploy the API on a cloud host, transcript fetching may fail because YouTube can block requests coming from datacenter IP ranges. The current transcript provider approach is best treated as local-development friendly rather than production-reliable.
+
 ### Deploy the API
 
 1. Create a Postgres database.
@@ -113,3 +179,6 @@ The API container creates its tables on startup using the configured database. F
 - `pnpm test:api`
 - `pnpm check:api`
 - `docker compose up --build`
+- `pnpm test:extension`
+- `pnpm --dir apps/extension exec tsc --noEmit`
+- `pnpm build:extension`
