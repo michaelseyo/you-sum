@@ -1,9 +1,7 @@
-import {
-  clearAuthState,
-  getAuthState,
-  signIn,
-} from "./lib/auth";
+import { clearAuthState, getAuthState, signIn } from "./lib/auth";
 import type { RuntimeMessage } from "./types/runtime";
+
+void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log("You Sum extension installed");
@@ -17,7 +15,9 @@ chrome.runtime.onMessage.addListener(
         .catch((error: unknown) =>
           sendResponse({
             error:
-              error instanceof Error ? error.message : "Unable to load auth state",
+              error instanceof Error
+                ? error.message
+                : "Unable to load auth state",
             ok: false,
           }),
         );
