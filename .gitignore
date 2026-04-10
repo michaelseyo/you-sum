@@ -9,3 +9,4 @@ coverage
 __pycache__/
 *.pyc
 .superpowers/
+apps/extension/*.zip
