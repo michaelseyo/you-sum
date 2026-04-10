@@ -1,10 +1,5 @@
 export type ExtensionEnv = "development" | "production";
 
-export const PRODUCTION_API_FALLBACK_URL = "https://api.yousum.app";
-
-const DEFAULT_GOOGLE_CLIENT_ID =
-  "253061236495-p8hohm7sna23d0fc8pgkut5c3mornbas.apps.googleusercontent.com";
-
 type ExtensionManifest = {
   action: {
     default_icon: Record<string, string>;
@@ -13,6 +8,7 @@ type ExtensionManifest = {
   };
   background: {
     service_worker: string;
+    type: "module";
   };
   content_scripts: Array<{
     js: string[];
@@ -21,6 +17,7 @@ type ExtensionManifest = {
   description: string;
   host_permissions: string[];
   icons: Record<string, string>;
+  key?: string;
   manifest_version: 3;
   name: string;
   oauth2: {
@@ -46,23 +43,33 @@ function resolveApiBaseUrl(env: ExtensionEnv): string {
     return process.env.EXTENSION_DEV_API_BASE_URL || "http://localhost:8000";
   }
 
-  return (
+  const apiBaseUrl =
     process.env.EXTENSION_PRODUCTION_API_BASE_URL ||
-    process.env.EXTENSION_API_BASE_URL ||
-    PRODUCTION_API_FALLBACK_URL
-  );
+    process.env.EXTENSION_API_BASE_URL;
+
+  if (!apiBaseUrl) {
+    throw new Error(
+      "EXTENSION_PRODUCTION_API_BASE_URL or EXTENSION_API_BASE_URL is not set.",
+    );
+  }
+
+  return apiBaseUrl;
 }
 
 function resolveGoogleClientId(env: ExtensionEnv): string {
-  if (env === "development") {
-    return process.env.EXTENSION_DEV_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
+  void env;
+  const clientId = process.env.EXTENSION_GOOGLE_CLIENT_ID?.trim();
+
+  if (!clientId) {
+    throw new Error("EXTENSION_GOOGLE_CLIENT_ID is not set.");
   }
 
-  return (
-    process.env.EXTENSION_PRODUCTION_GOOGLE_CLIENT_ID ||
-    process.env.EXTENSION_GOOGLE_CLIENT_ID ||
-    DEFAULT_GOOGLE_CLIENT_ID
-  );
+  return clientId;
+}
+
+// for extension id consistency
+function resolveExtensionKey(): string | undefined {
+  return process.env.EXTENSION_PUBLIC_KEY;
 }
 
 function toHostPermission(apiBaseUrl: string): string {
@@ -70,10 +77,13 @@ function toHostPermission(apiBaseUrl: string): string {
   return `${normalizedOrigin}/*`;
 }
 
-export function resolveExtensionBuildConfig(mode: string): ExtensionBuildConfig {
+export function resolveExtensionBuildConfig(
+  mode: string,
+): ExtensionBuildConfig {
   const env = resolveEnv(mode);
   const apiBaseUrl = resolveApiBaseUrl(env);
   const googleClientId = resolveGoogleClientId(env);
+  const extensionKey = resolveExtensionKey();
   const extensionName = env === "production" ? "Yousum" : "Yousum Dev";
 
   return {
@@ -81,11 +91,15 @@ export function resolveExtensionBuildConfig(mode: string): ExtensionBuildConfig 
     env,
     manifest: {
       manifest_version: 3,
+      ...(extensionKey ? { key: extensionKey } : {}),
       name: extensionName,
       version: "0.1.0",
       description: "Summarize the current YouTube video.",
       permissions: ["activeTab", "identity", "storage"],
-      host_permissions: ["https://www.youtube.com/*", toHostPermission(apiBaseUrl)],
+      host_permissions: [
+        "https://www.youtube.com/*",
+        toHostPermission(apiBaseUrl),
+      ],
       oauth2: {
         client_id: googleClientId,
         scopes: ["openid", "email", "profile"],
@@ -106,6 +120,7 @@ export function resolveExtensionBuildConfig(mode: string): ExtensionBuildConfig 
       },
       background: {
         service_worker: "src/background.js",
+        type: "module",
       },
       content_scripts: [
         {

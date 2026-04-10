@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import type { ConfigEnv, Plugin } from "vite";
+import { loadEnv } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import { defineConfig } from "vitest/config";
 import { resolveExtensionBuildConfig } from "./manifest.config";
@@ -23,6 +24,23 @@ function generateManifestFile(manifest: object): Plugin {
 }
 
 export default defineConfig((configEnv: ConfigEnv) => {
+  const loadedEnv = loadEnv(configEnv.mode, currentDir, "");
+
+  // Override environment variables with loaded values
+  process.env.EXTENSION_PUBLIC_KEY =
+    process.env.EXTENSION_PUBLIC_KEY || loadedEnv.EXTENSION_PUBLIC_KEY;
+  process.env.EXTENSION_GOOGLE_CLIENT_ID =
+    process.env.EXTENSION_GOOGLE_CLIENT_ID ||
+    loadedEnv.EXTENSION_GOOGLE_CLIENT_ID;
+  process.env.EXTENSION_API_BASE_URL =
+    process.env.EXTENSION_API_BASE_URL || loadedEnv.EXTENSION_API_BASE_URL;
+  process.env.EXTENSION_DEV_API_BASE_URL =
+    process.env.EXTENSION_DEV_API_BASE_URL ||
+    loadedEnv.EXTENSION_DEV_API_BASE_URL;
+  process.env.EXTENSION_PRODUCTION_API_BASE_URL =
+    process.env.EXTENSION_PRODUCTION_API_BASE_URL ||
+    loadedEnv.EXTENSION_PRODUCTION_API_BASE_URL;
+
   const extensionBuildConfig = resolveExtensionBuildConfig(configEnv.mode);
 
   return {
@@ -55,8 +73,6 @@ export default defineConfig((configEnv: ConfigEnv) => {
     },
     define: {
       __API_BASE_URL__: JSON.stringify(extensionBuildConfig.apiBaseUrl),
-      __EXTENSION_ENV__: JSON.stringify(extensionBuildConfig.env),
-      __IS_PRODUCTION__: JSON.stringify(extensionBuildConfig.env === "production"),
     },
     plugins: [
       react(),

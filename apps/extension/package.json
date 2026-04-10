@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite build --watch --mode development",
-    "build": "vite build --mode production",
-    "test": "vitest run"
+    "build": "vite build --mode production && rm -f yousum-extension-prod.zip && cd dist && zip -r ../yousum-extension-prod.zip .",
+    "build:dev": "vite build --mode development",
+    "test": "EXTENSION_GOOGLE_CLIENT_ID=test-extension-client-id.apps.googleusercontent.com vitest run"
   },
   "dependencies": {
     "react": "^19.2.0",

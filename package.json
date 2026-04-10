@@ -13,6 +13,7 @@
     "test:api": "uv run --directory apps/api python -m unittest discover -s tests -v",
     "dev:extension": "pnpm --dir apps/extension dev",
     "build:extension": "pnpm --dir apps/extension build",
+    "build-dev:extension": "pnpm --dir apps/extension build:dev",
     "test:extension": "pnpm --dir apps/extension test",
     "lint": "echo \"Add linting once the stack is chosen\""
   }
