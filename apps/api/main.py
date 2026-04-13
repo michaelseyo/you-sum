@@ -77,8 +77,10 @@ async def authenticate_with_google(
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
     logger.info("Google auth succeeded for email=%s user_id=%s", user.email, user.id)
+    issued_token = auth_service.issue_access_token(user)
     return AuthResponse(
-        access_token=auth_service.issue_access_token(user),
+        access_token=issued_token.access_token,
+        expires_at=issued_token.expires_at,
         token_type="bearer",
         user=build_user_response(user),
     )
@@ -99,8 +101,10 @@ if auth_service.dev_login_enabled:
             raise HTTPException(status_code=401, detail=str(exc)) from exc
 
         logger.info("Dev login succeeded for email=%s user_id=%s", user.email, user.id)
+        issued_token = auth_service.issue_access_token(user)
         return AuthResponse(
-            access_token=auth_service.issue_access_token(user),
+            access_token=issued_token.access_token,
+            expires_at=issued_token.expires_at,
             token_type="bearer",
             user=build_user_response(user),
         )

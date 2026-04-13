@@ -7,6 +7,7 @@ export type ExtensionUser = {
 
 export type AuthState = {
   accessToken: string;
+  expiresAt: number;
   user: ExtensionUser;
 };
 
@@ -22,6 +23,7 @@ export type SummarizeResponse = {
 
 export type GoogleAuthExchangeResponse = {
   access_token: string;
+  expires_at: number;
   user: ExtensionUser;
 };
 

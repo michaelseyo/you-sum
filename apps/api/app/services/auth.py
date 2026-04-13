@@ -37,6 +37,12 @@ class VerifiedGoogleIdentity:
     picture_url: str | None
 
 
+@dataclass(slots=True)
+class IssuedAccessToken:
+    access_token: str
+    expires_at: int
+
+
 def normalize_optional_string(value: object) -> str | None:
     if value is None:
         return None
@@ -158,10 +164,12 @@ class AuthService:
             is_allowed=True,
         )
 
-    def issue_access_token(self, user: User) -> str:
+    def issue_access_token(self, user: User) -> IssuedAccessToken:
         issued_at = datetime.now(timezone.utc)
         # timedelta defines how long the token should remain valid.
         expires_at = issued_at + timedelta(minutes=self.jwt_expires_minutes)
+        # Unix seconds, matching the JWT exp claim and API response.
+        expires_at_timestamp = int(expires_at.timestamp())
         payload = {
             # JWT standard claims:
             # sub = subject (our local user ID)
@@ -170,9 +178,12 @@ class AuthService:
             "sub": str(user.id),
             "email": user.email,
             "iat": int(issued_at.timestamp()),
-            "exp": int(expires_at.timestamp()),
+            "exp": expires_at_timestamp,
         }
-        return jwt.encode(payload, self.jwt_secret, algorithm="HS256")
+        return IssuedAccessToken(
+            access_token=jwt.encode(payload, self.jwt_secret, algorithm="HS256"),
+            expires_at=expires_at_timestamp,
+        )
 
     def authenticate_app_token(self, db: Session, token: str) -> User:
         try:

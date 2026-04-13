@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
@@ -66,6 +67,11 @@ class AuthRoutesTestCase(unittest.TestCase):
         self.assertEqual(payload["token_type"], "bearer")
         self.assertEqual(payload["user"]["email"], "user@example.com")
         self.assertTrue(payload["access_token"])
+        self.assertNotIn("expires_in", payload)
+        self.assertGreaterEqual(
+            payload["expires_at"],
+            int(datetime.now(timezone.utc).timestamp()),
+        )
 
     def test_google_auth_rejects_invalid_google_token(self) -> None:
         temp_dir, main_module = load_main_module()
