@@ -2,6 +2,7 @@ import { API_BASE_URL } from "../config/env";
 import type { AuthState, GoogleAuthExchangeResponse } from "../types/runtime";
 
 export const AUTH_STORAGE_KEY = "authState";
+const AUTH_EXPIRY_BUFFER_MS = 30_000;
 
 export function getGoogleClientId(): string | undefined {
   return chrome.runtime.getManifest().oauth2?.client_id;
@@ -90,7 +91,20 @@ export async function clearAuthState() {
 
 export async function getAuthState(): Promise<AuthState | null> {
   const stored = await chrome.storage.local.get(AUTH_STORAGE_KEY);
-  return (stored[AUTH_STORAGE_KEY] as AuthState | undefined) || null;
+  const authState = stored[AUTH_STORAGE_KEY] as AuthState | undefined;
+  if (!authState) {
+    return null;
+  }
+
+  if (
+    typeof authState.expiresAt !== "number" ||
+    authState.expiresAt <= Date.now() + AUTH_EXPIRY_BUFFER_MS
+  ) {
+    await clearAuthState();
+    return null;
+  }
+
+  return authState;
 }
 
 export async function signIn() {
@@ -108,6 +122,8 @@ export async function signIn() {
   const authPayload = await exchangeGoogleToken(idToken);
   const authState = {
     accessToken: authPayload.access_token,
+    // The API returns Unix seconds; Date.now() comparisons use milliseconds.
+    expiresAt: authPayload.expires_at * 1000,
     user: authPayload.user,
   };
 

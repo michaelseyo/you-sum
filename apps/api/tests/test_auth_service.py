@@ -112,8 +112,10 @@ class AuthServiceTestCase(unittest.TestCase):
 
         with open_session() as db:
             user = service.authenticate_google_user(db, "token")
-            access_token = service.issue_access_token(user)
-            authenticated_user = service.authenticate_app_token(db, access_token)
+            issued_token = service.issue_access_token(user)
+            authenticated_user = service.authenticate_app_token(
+                db, issued_token.access_token
+            )
 
         self.assertEqual(authenticated_user.id, user.id)
         self.assertEqual(authenticated_user.email, "user@example.com")

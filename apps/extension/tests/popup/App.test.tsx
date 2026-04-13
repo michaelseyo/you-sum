@@ -48,6 +48,7 @@ describe("App", () => {
     chromeHelpers.sendRuntimeMessage.mockResolvedValue({
       authState: {
         accessToken: "token",
+        expiresAt: Date.now() + 60_000,
         user: {
           email: "test@example.com",
         },

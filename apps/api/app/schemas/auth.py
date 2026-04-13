@@ -20,8 +20,9 @@ class DevLoginRequest(BaseModel):
 
 class AuthResponse(BaseModel):
     access_token: str
+    expires_at: int
     token_type: Literal["bearer"]
-    user: UserResponse  
+    user: UserResponse
 
 
 class CurrentUserResponse(BaseModel):
