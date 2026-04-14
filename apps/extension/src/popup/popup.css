@@ -53,5 +53,6 @@ pre {
   border-radius: 10px;
   background: white;
   white-space: pre-wrap;
-  font-size: 12px;
+  font-size: 14px;
+  font-family: Arial, sans-serif;
 }
