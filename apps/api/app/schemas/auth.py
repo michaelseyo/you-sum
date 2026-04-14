@@ -1,10 +1,10 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 class UserResponse(BaseModel):
-    email: str
+    email: EmailStr
     name: str | None
     picture_url: str | None
     is_allowed: bool
@@ -15,7 +15,7 @@ class GoogleAuthRequest(BaseModel):
 
 
 class DevLoginRequest(BaseModel):
-    email: str | None = None
+    email: EmailStr | None = None
 
 
 class AuthResponse(BaseModel):
