@@ -1,4 +1,5 @@
 import logging
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from app.prompts.summarize import SUMMARY_PROMPT_VERSION
@@ -13,6 +14,8 @@ from app.services.transcript import fetch_transcript_text
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+StreamEvent = dict[str, str | bool]
 
 
 @dataclass(slots=True)
@@ -98,3 +101,72 @@ class SummarizeOrchestrator:
             cached=False,
             prompt_version=SUMMARY_PROMPT_VERSION,
         )
+
+    async def stream_summarize_video(
+        self, db: Session, video_id: str
+    ) -> AsyncIterator[StreamEvent]:
+        # Keep transcript reuse aligned with the non-streaming path.
+        transcript = self.transcripts_repository.get_by_video_id(db, video_id=video_id)
+
+        if transcript is None:
+            logger.info("Transcript cache miss for video_id=%s", video_id)
+            yield {"type": "status", "message": "Fetching transcript..."}
+            transcript_text = normalize_transcript_text(
+                fetch_transcript_text(video_id=video_id)
+            )
+            transcript = self.transcripts_repository.save_transcript(
+                db,
+                video_id=video_id,
+                transcript_text=transcript_text,
+                transcript_fingerprint=build_transcript_fingerprint(transcript_text),
+            )
+        else:
+            logger.info("Transcript cache hit for video_id=%s", video_id)
+            self.transcripts_repository.update_last_accessed(
+                db, transcript_id=transcript.id
+            )
+
+        yield {"type": "status", "message": "Checking cache..."}
+        cached_record = self.summaries_repository.get_by_cache_key(
+            db,
+            transcript_id=transcript.id,
+            model=self.summary_service.model,
+            prompt_version=SUMMARY_PROMPT_VERSION,
+        )
+
+        if cached_record is not None:
+            logger.info("Summary cache hit for video_id=%s", video_id)
+            self.summaries_repository.update_last_accessed(
+                db,
+                summary_id=cached_record.id,
+            )
+            yield {"type": "delta", "text": cached_record.summary_text}
+            yield {
+                "type": "done",
+                "cached": True,
+                "prompt_version": SUMMARY_PROMPT_VERSION,
+            }
+            return
+
+        logger.info("Summary cache miss for video_id=%s", video_id)
+        yield {"type": "status", "message": "Writing summary..."}
+        summary_chunks = []
+        async for chunk in self.summary_service.stream_summary_transcript(
+            transcript.transcript_text
+        ):
+            summary_chunks.append(chunk)
+            yield {"type": "delta", "text": chunk}
+
+        summary_text = "".join(summary_chunks)
+        self.summaries_repository.save_summary(
+            db,
+            transcript_id=transcript.id,
+            summary_text=summary_text,
+            model=self.summary_service.model,
+            prompt_version=SUMMARY_PROMPT_VERSION,
+        )
+        yield {
+            "type": "done",
+            "cached": False,
+            "prompt_version": SUMMARY_PROMPT_VERSION,
+        }

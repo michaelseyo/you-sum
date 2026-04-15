@@ -155,3 +155,92 @@ class SummarizeOrchestratorTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(summary_service.calls, 0)
         self.assertEqual(transcripts_repository.access_updates, 1)
         self.assertEqual(summaries_repository.access_updates, 1)
+
+    async def test_stream_reuses_cached_summary(self) -> None:
+        summary_service = FakeSummaryService()
+        transcripts_repository = InMemoryTranscriptsRepository()
+        summaries_repository = InMemorySummariesRepository()
+        transcript_text = "hello world"
+        transcript = transcripts_repository.save_transcript(
+            object(),
+            video_id="video-1",
+            transcript_text=transcript_text,
+            transcript_fingerprint=build_transcript_fingerprint(transcript_text),
+        )
+        summaries_repository.save_summary(
+            object(),
+            transcript_id=transcript.id,
+            summary_text="cached summary",
+            model="gpt-5-mini",
+            prompt_version=SUMMARY_PROMPT_VERSION,
+        )
+        orchestrator = SummarizeOrchestrator(
+            summary_service=summary_service,
+            transcripts_repository=transcripts_repository,
+            summaries_repository=summaries_repository,
+        )
+
+        events = [
+            event
+            async for event in orchestrator.stream_summarize_video(object(), "video-1")
+        ]
+
+        self.assertEqual(
+            events,
+            [
+                {"type": "status", "message": "Checking cache..."},
+                {"type": "delta", "text": "cached summary"},
+                {
+                    "type": "done",
+                    "cached": True,
+                    "prompt_version": SUMMARY_PROMPT_VERSION,
+                },
+            ],
+        )
+        self.assertEqual(summary_service.calls, 0)
+
+    async def test_stream_generates_and_caches_summary(self) -> None:
+        summary_service = FakeSummaryService()
+        transcripts_repository = InMemoryTranscriptsRepository()
+        summaries_repository = InMemorySummariesRepository()
+        orchestrator = SummarizeOrchestrator(
+            summary_service=summary_service,
+            transcripts_repository=transcripts_repository,
+            summaries_repository=summaries_repository,
+        )
+
+        from unittest.mock import patch
+
+        with patch(
+            "app.services.summarize_orchestrator.fetch_transcript_text",
+            return_value="hello world",
+        ):
+            events = [
+                event
+                async for event in orchestrator.stream_summarize_video(
+                    object(), "video-1"
+                )
+            ]
+
+        self.assertEqual(
+            events,
+            [
+                {"type": "status", "message": "Fetching transcript..."},
+                {"type": "status", "message": "Checking cache..."},
+                {"type": "status", "message": "Writing summary..."},
+                {"type": "delta", "text": "summary:"},
+                {"type": "delta", "text": "hello world"},
+                {
+                    "type": "done",
+                    "cached": False,
+                    "prompt_version": SUMMARY_PROMPT_VERSION,
+                },
+            ],
+        )
+        cached = summaries_repository.get_by_cache_key(
+            object(),
+            transcript_id=1,
+            model="gpt-5-mini",
+            prompt_version=SUMMARY_PROMPT_VERSION,
+        )
+        self.assertEqual(cached.summary_text, "summary:hello world")
