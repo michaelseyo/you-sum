@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { summarizeVideo } from "../lib/api";
+import { summarizeVideoStream } from "../lib/api";
 import {
   getActiveTab,
   getVideoContext,
@@ -82,6 +82,7 @@ export function App() {
 
     setStatus("Reading current tab...");
     setResult("Loading...");
+    let receivedText = false;
 
     try {
       const tab = await getActiveTab();
@@ -97,14 +98,39 @@ export function App() {
       }
 
       setStatus(`Summarizing ${context.videoId}...`);
-      const data = await summarizeVideo(context.videoId, authState.accessToken);
-      setResult(data.summary);
-      setStatus("Summary loaded");
+      setResult("");
+      await summarizeVideoStream(
+        context.videoId,
+        authState.accessToken,
+        (event) => {
+          if (event.type === "status") {
+            setStatus(event.message);
+            return;
+          }
+
+          if (event.type === "delta") {
+            receivedText = true;
+            setResult((current) => current + event.text);
+            return;
+          }
+
+          if (event.type === "done") {
+            setStatus(event.cached ? "Cached summary loaded" : "Summary loaded");
+            return;
+          }
+
+          if (event.type === "error") {
+            setStatus("Unable to summarize video");
+          }
+        },
+      );
     } catch (error: unknown) {
       setStatus("Unable to summarize video");
-      setResult(
-        error instanceof Error ? error.message : "Unable to summarize video",
-      );
+      if (!receivedText) {
+        setResult(
+          error instanceof Error ? error.message : "Unable to summarize video",
+        );
+      }
     }
   }
 
