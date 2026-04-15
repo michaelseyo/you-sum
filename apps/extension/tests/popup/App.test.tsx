@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../src/popup/App";
+import type { SummarizeStreamEvent } from "../../src/types/runtime";
 
 const chromeHelpers = vi.hoisted(() => ({
   getActiveTab: vi.fn(),
@@ -168,6 +169,76 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(summarizeButton).not.toBeDisabled();
+    });
+  });
+
+  it("ignores stream events after sign-out starts", async () => {
+    let resolveSignOut: (() => void) | null = null;
+    chromeHelpers.sendRuntimeMessage.mockImplementation(async (message) => {
+      if (message.type === "AUTH_GET_STATE") {
+        return {
+          authState: {
+            accessToken: "token",
+            expiresAt: Date.now() + 60_000,
+            user: {
+              email: "test@example.com",
+            },
+          },
+          ok: true,
+        };
+      }
+
+      if (message.type === "AUTH_SIGN_OUT") {
+        await new Promise<void>((resolve) => {
+          resolveSignOut = resolve;
+        });
+        return { ok: true };
+      }
+
+      return { error: "Unexpected message", ok: false };
+    });
+    chromeHelpers.getActiveTab.mockResolvedValue({ id: 1 });
+    chromeHelpers.getVideoContext.mockResolvedValue({
+      title: "Video",
+      url: "https://youtube.com/watch?v=video-1",
+      videoId: "video-1",
+    });
+
+    let streamEvent: ((event: SummarizeStreamEvent) => void) | null = null;
+    let finishStream: (() => void) | null = null;
+    apiHelpers.summarizeVideoStream.mockImplementation(
+      async (_videoId, _accessToken, onEvent) => {
+        streamEvent = onEvent;
+        onEvent({ text: "Working", type: "delta" });
+        await new Promise<void>((resolve) => {
+          finishStream = resolve;
+        });
+      },
+    );
+
+    render(<App />);
+
+    const summarizeButton = await screen.findByRole("button", {
+      name: "Summarize this video",
+    });
+    await waitFor(() => {
+      expect(summarizeButton).not.toBeDisabled();
+    });
+    fireEvent.click(summarizeButton);
+    expect(await screen.findByText("Working")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    await act(async () => {
+      streamEvent?.({ text: " stale", type: "delta" });
+      finishStream?.();
+    });
+
+    expect(screen.getByText("Working")).toBeInTheDocument();
+    expect(screen.queryByText("Working stale")).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveSignOut?.();
     });
   });
 });

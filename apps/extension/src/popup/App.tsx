@@ -62,14 +62,14 @@ export function App() {
 
   async function handleSignOut() {
     try {
+      summarizeAttemptRef.current += 1;
+      setIsSummarizing(false);
       const response = await sendRuntimeMessage({ type: "AUTH_SIGN_OUT" });
       if (!response.ok) {
         throw new Error(response.error || "Sign-out failed");
       }
 
       setAuthState(null);
-      summarizeAttemptRef.current += 1;
-      setIsSummarizing(false);
       setAuthStatus("Sign in with Google to use your backend.");
       setStatus("Ready to summarize the current video.");
       setResult("No summary yet.");
