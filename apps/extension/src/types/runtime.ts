@@ -21,6 +21,25 @@ export type SummarizeResponse = {
   summary: string;
 };
 
+export type SummarizeStreamEvent =
+  | {
+      message: string;
+      type: "status";
+    }
+  | {
+      text: string;
+      type: "delta";
+    }
+  | {
+      cached: boolean;
+      prompt_version: string;
+      type: "done";
+    }
+  | {
+      message: string;
+      type: "error";
+    };
+
 export type GoogleAuthExchangeResponse = {
   access_token: string;
   expires_at: number;

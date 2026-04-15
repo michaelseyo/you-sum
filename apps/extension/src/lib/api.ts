@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "../config/env";
-import type { SummarizeResponse } from "../types/runtime";
+import type { SummarizeResponse, SummarizeStreamEvent } from "../types/runtime";
 
 type ApiErrorPayload = {
   detail?: string;
@@ -26,4 +26,64 @@ export async function summarizeVideo(
   }
 
   return payload;
+}
+
+export async function summarizeVideoStream(
+  videoId: string,
+  accessToken: string,
+  onEvent: (event: SummarizeStreamEvent) => void,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/summarize/stream`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ video_id: videoId }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
+    throw new Error(payload.detail || "API request failed");
+  }
+
+  if (!response.body) {
+    throw new Error("Streaming is not supported in this browser");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.trim()) {
+        continue;
+      }
+
+      const event = JSON.parse(line) as SummarizeStreamEvent;
+      onEvent(event);
+      if (event.type === "error") {
+        throw new Error(event.message);
+      }
+    }
+  }
+
+  buffer += decoder.decode();
+  if (buffer.trim()) {
+    const event = JSON.parse(buffer) as SummarizeStreamEvent;
+    onEvent(event);
+    if (event.type === "error") {
+      throw new Error(event.message);
+    }
+  }
 }
