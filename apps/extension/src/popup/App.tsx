@@ -15,6 +15,7 @@ export function App() {
   const [status, setStatus] = useState("Ready to summarize the current video.");
   const [result, setResult] = useState("No summary yet.");
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const summarizeAttemptRef = useRef(0);
 
   const signedIn = Boolean(authState?.accessToken);
@@ -63,6 +64,7 @@ export function App() {
   async function handleSignOut() {
     try {
       summarizeAttemptRef.current += 1;
+      setIsSigningOut(true);
       setIsSummarizing(false);
       const response = await sendRuntimeMessage({ type: "AUTH_SIGN_OUT" });
       if (!response.ok) {
@@ -75,12 +77,17 @@ export function App() {
       setResult("No summary yet.");
     } catch (error: unknown) {
       setAuthStatus(error instanceof Error ? error.message : "Sign-out failed");
+    } finally {
+      setIsSigningOut(false);
     }
   }
 
   async function handleSummarize() {
     if (!authState?.accessToken) {
       setStatus("Sign in before summarizing.");
+      return;
+    }
+    if (isSigningOut) {
       return;
     }
     if (isSummarizing) {
@@ -167,13 +174,18 @@ export function App() {
           </button>
         ) : null}
         {signedIn ? (
-          <button className="secondary" onClick={handleSignOut} type="button">
+          <button
+            className="secondary"
+            disabled={isSigningOut}
+            onClick={handleSignOut}
+            type="button"
+          >
             Sign out
           </button>
         ) : null}
       </div>
       <button
-        disabled={!signedIn || isSummarizing}
+        disabled={!signedIn || isSummarizing || isSigningOut}
         onClick={handleSummarize}
         type="button"
       >

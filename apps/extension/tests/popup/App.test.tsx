@@ -229,6 +229,12 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
+    await waitFor(() => {
+      expect(summarizeButton).toBeDisabled();
+    });
+    fireEvent.click(summarizeButton);
+    expect(apiHelpers.summarizeVideoStream).toHaveBeenCalledTimes(1);
+
     await act(async () => {
       streamEvent?.({ text: " stale", type: "delta" });
       finishStream?.();
