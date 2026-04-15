@@ -14,6 +14,11 @@ class FakeSummaryService:
         self.calls += 1
         return f"summary:{transcript_text}"
 
+    async def stream_summary_transcript(self, transcript_text: str):
+        self.calls += 1
+        for chunk in ("summary:", transcript_text):
+            yield chunk
+
 
 class InMemoryTranscriptsRepository:
     def __init__(self) -> None:
