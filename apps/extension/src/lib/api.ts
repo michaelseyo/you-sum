@@ -54,36 +54,45 @@ export async function summarizeVideoStream(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let streamCompleted = false;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-
-    for (const line of lines) {
-      if (!line.trim()) {
-        continue;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
       }
 
-      const event = JSON.parse(line) as SummarizeStreamEvent;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.trim()) {
+          continue;
+        }
+
+        const event = JSON.parse(line) as SummarizeStreamEvent;
+        onEvent(event);
+        if (event.type === "error") {
+          throw new Error(event.message);
+        }
+      }
+    }
+
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      const event = JSON.parse(buffer) as SummarizeStreamEvent;
       onEvent(event);
       if (event.type === "error") {
         throw new Error(event.message);
       }
     }
-  }
-
-  buffer += decoder.decode();
-  if (buffer.trim()) {
-    const event = JSON.parse(buffer) as SummarizeStreamEvent;
-    onEvent(event);
-    if (event.type === "error") {
-      throw new Error(event.message);
+    streamCompleted = true;
+  } finally {
+    if (!streamCompleted) {
+      await reader.cancel().catch(() => undefined);
     }
+    reader.releaseLock();
   }
 }
