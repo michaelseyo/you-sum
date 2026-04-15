@@ -9,8 +9,12 @@ from app.dependencies.auth import auth_service, get_current_user
 from app.helpers.auth import build_user_response
 from app.repositories.summaries_repository import SummariesRepository
 from app.repositories.transcripts_repository import TranscriptsRepository
-from app.schemas.auth import (AuthResponse, CurrentUserResponse,
-                              DevLoginRequest, GoogleAuthRequest)
+from app.schemas.auth import (
+    AuthResponse,
+    CurrentUserResponse,
+    DevLoginRequest,
+    GoogleAuthRequest,
+)
 from app.schemas.summarize import SummarizeRequest, SummarizeResponse
 from app.services.auth import AuthenticationError, AuthorizationError
 from app.services.summarize_orchestrator import SummarizeOrchestrator
@@ -112,7 +116,11 @@ if auth_service.dev_login_enabled:
 
 @app.get("/me", response_model=CurrentUserResponse)
 async def me(current_user=Depends(get_current_user)) -> CurrentUserResponse:
-    logger.info("Current user requested for email=%s user_id=%s", current_user.email, current_user.id)
+    logger.info(
+        "Current user requested for email=%s user_id=%s",
+        current_user.email,
+        current_user.id,
+    )
     return CurrentUserResponse(user=build_user_response(current_user))
 
 

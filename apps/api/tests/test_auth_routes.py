@@ -60,7 +60,9 @@ class AuthRoutesTestCase(unittest.TestCase):
                     },
                 )(),
             ):
-                response = client.post("/auth/google", json={"id_token": "google-token"})
+                response = client.post(
+                    "/auth/google", json={"id_token": "google-token"}
+                )
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
@@ -109,7 +111,9 @@ class AuthRoutesTestCase(unittest.TestCase):
                     },
                 )(),
             ):
-                response = client.post("/auth/google", json={"id_token": "google-token"})
+                response = client.post(
+                    "/auth/google", json={"id_token": "google-token"}
+                )
 
         self.assertEqual(response.status_code, 403)
 
