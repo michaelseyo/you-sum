@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../src/popup/App";
 
@@ -112,5 +112,62 @@ describe("App", () => {
       "token",
       expect.any(Function),
     );
+  });
+
+  it("prevents overlapping summary streams", async () => {
+    chromeHelpers.sendRuntimeMessage.mockResolvedValue({
+      authState: {
+        accessToken: "token",
+        expiresAt: Date.now() + 60_000,
+        user: {
+          email: "test@example.com",
+        },
+      },
+      ok: true,
+    });
+    chromeHelpers.getActiveTab.mockResolvedValue({ id: 1 });
+    chromeHelpers.getVideoContext.mockResolvedValue({
+      title: "Video",
+      url: "https://youtube.com/watch?v=video-1",
+      videoId: "video-1",
+    });
+
+    let finishStream: (() => void) | null = null;
+    apiHelpers.summarizeVideoStream.mockImplementation(
+      async (_videoId, _accessToken, onEvent) => {
+        onEvent({ text: "Working", type: "delta" });
+        await new Promise<void>((resolve) => {
+          finishStream = () => {
+            onEvent({ cached: false, prompt_version: "v1", type: "done" });
+            resolve();
+          };
+        });
+      },
+    );
+
+    render(<App />);
+
+    const summarizeButton = await screen.findByRole("button", {
+      name: "Summarize this video",
+    });
+    await waitFor(() => {
+      expect(summarizeButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(summarizeButton);
+
+    await waitFor(() => {
+      expect(summarizeButton).toBeDisabled();
+    });
+    fireEvent.click(summarizeButton);
+    expect(apiHelpers.summarizeVideoStream).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      finishStream?.();
+    });
+
+    await waitFor(() => {
+      expect(summarizeButton).not.toBeDisabled();
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { summarizeVideoStream } from "../lib/api";
 import {
   getActiveTab,
@@ -14,6 +14,8 @@ export function App() {
   );
   const [status, setStatus] = useState("Ready to summarize the current video.");
   const [result, setResult] = useState("No summary yet.");
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const summarizeAttemptRef = useRef(0);
 
   const signedIn = Boolean(authState?.accessToken);
 
@@ -66,6 +68,8 @@ export function App() {
       }
 
       setAuthState(null);
+      summarizeAttemptRef.current += 1;
+      setIsSummarizing(false);
       setAuthStatus("Sign in with Google to use your backend.");
       setStatus("Ready to summarize the current video.");
       setResult("No summary yet.");
@@ -79,7 +83,13 @@ export function App() {
       setStatus("Sign in before summarizing.");
       return;
     }
+    if (isSummarizing) {
+      return;
+    }
 
+    const attemptId = summarizeAttemptRef.current + 1;
+    summarizeAttemptRef.current = attemptId;
+    setIsSummarizing(true);
     setStatus("Reading current tab...");
     setResult("Loading...");
     let receivedText = false;
@@ -103,6 +113,10 @@ export function App() {
         context.videoId,
         authState.accessToken,
         (event) => {
+          if (summarizeAttemptRef.current !== attemptId) {
+            return;
+          }
+
           if (event.type === "status") {
             setStatus(event.message);
             return;
@@ -125,11 +139,18 @@ export function App() {
         },
       );
     } catch (error: unknown) {
+      if (summarizeAttemptRef.current !== attemptId) {
+        return;
+      }
       setStatus("Unable to summarize video");
       if (!receivedText) {
         setResult(
           error instanceof Error ? error.message : "Unable to summarize video",
         );
+      }
+    } finally {
+      if (summarizeAttemptRef.current === attemptId) {
+        setIsSummarizing(false);
       }
     }
   }
@@ -151,7 +172,11 @@ export function App() {
           </button>
         ) : null}
       </div>
-      <button disabled={!signedIn} onClick={handleSummarize} type="button">
+      <button
+        disabled={!signedIn || isSummarizing}
+        onClick={handleSummarize}
+        type="button"
+      >
         Summarize this video
       </button>
       <pre>{result}</pre>
