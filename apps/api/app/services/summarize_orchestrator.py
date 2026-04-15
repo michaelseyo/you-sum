@@ -150,9 +150,13 @@ class SummarizeOrchestrator:
 
         logger.info("Summary cache miss for video_id=%s", video_id)
         yield {"type": "status", "message": "Writing summary..."}
+        transcript_id = transcript.id
+        transcript_text = transcript.transcript_text
+        db.rollback()
+
         summary_chunks = []
         async for chunk in self.summary_service.stream_summary_transcript(
-            transcript.transcript_text
+            transcript_text
         ):
             summary_chunks.append(chunk)
             yield {"type": "delta", "text": chunk}
@@ -160,7 +164,7 @@ class SummarizeOrchestrator:
         summary_text = "".join(summary_chunks)
         self.summaries_repository.save_summary(
             db,
-            transcript_id=transcript.id,
+            transcript_id=transcript_id,
             summary_text=summary_text,
             model=self.summary_service.model,
             prompt_version=SUMMARY_PROMPT_VERSION,

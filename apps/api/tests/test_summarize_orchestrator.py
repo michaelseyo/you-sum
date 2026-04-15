@@ -91,6 +91,14 @@ class InMemorySummariesRepository:
         self.access_updates += 1
 
 
+class FakeDb:
+    def __init__(self) -> None:
+        self.rollbacks = 0
+
+    def rollback(self) -> None:
+        self.rollbacks += 1
+
+
 class SummarizeOrchestratorTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_generates_and_caches_summary_on_first_request(self) -> None:
         summary_service = FakeSummaryService()
@@ -200,6 +208,7 @@ class SummarizeOrchestratorTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(summary_service.calls, 0)
 
     async def test_stream_generates_and_caches_summary(self) -> None:
+        db = FakeDb()
         summary_service = FakeSummaryService()
         transcripts_repository = InMemoryTranscriptsRepository()
         summaries_repository = InMemorySummariesRepository()
@@ -217,9 +226,7 @@ class SummarizeOrchestratorTestCase(unittest.IsolatedAsyncioTestCase):
         ):
             events = [
                 event
-                async for event in orchestrator.stream_summarize_video(
-                    object(), "video-1"
-                )
+                async for event in orchestrator.stream_summarize_video(db, "video-1")
             ]
 
         self.assertEqual(
@@ -244,3 +251,4 @@ class SummarizeOrchestratorTestCase(unittest.IsolatedAsyncioTestCase):
             prompt_version=SUMMARY_PROMPT_VERSION,
         )
         self.assertEqual(cached.summary_text, "summary:hello world")
+        self.assertEqual(db.rollbacks, 1)

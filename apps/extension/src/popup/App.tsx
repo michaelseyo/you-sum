@@ -17,6 +17,7 @@ export function App() {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const summarizeAttemptRef = useRef(0);
+  const streamAbortRef = useRef<AbortController | null>(null);
 
   const signedIn = Boolean(authState?.accessToken);
 
@@ -41,6 +42,10 @@ export function App() {
       setAuthStatus(message);
       setAuthState(null);
     });
+
+    return () => {
+      streamAbortRef.current?.abort();
+    };
   }, []);
 
   async function handleSignIn() {
@@ -64,6 +69,7 @@ export function App() {
   async function handleSignOut() {
     try {
       summarizeAttemptRef.current += 1;
+      streamAbortRef.current?.abort();
       setIsSigningOut(true);
       setIsSummarizing(false);
       const response = await sendRuntimeMessage({ type: "AUTH_SIGN_OUT" });
@@ -96,6 +102,9 @@ export function App() {
 
     const attemptId = summarizeAttemptRef.current + 1;
     summarizeAttemptRef.current = attemptId;
+    streamAbortRef.current?.abort();
+    const abortController = new AbortController();
+    streamAbortRef.current = abortController;
     setIsSummarizing(true);
     setStatus("Reading current tab...");
     setResult("Loading...");
@@ -144,6 +153,7 @@ export function App() {
             setStatus("Unable to summarize video");
           }
         },
+        abortController.signal,
       );
     } catch (error: unknown) {
       if (summarizeAttemptRef.current !== attemptId) {
@@ -158,6 +168,9 @@ export function App() {
     } finally {
       if (summarizeAttemptRef.current === attemptId) {
         setIsSummarizing(false);
+      }
+      if (streamAbortRef.current === abortController) {
+        streamAbortRef.current = null;
       }
     }
   }

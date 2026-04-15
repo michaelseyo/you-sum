@@ -32,6 +32,7 @@ export async function summarizeVideoStream(
   videoId: string,
   accessToken: string,
   onEvent: (event: SummarizeStreamEvent) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/summarize/stream`, {
     method: "POST",
@@ -40,6 +41,7 @@ export async function summarizeVideoStream(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ video_id: videoId }),
+    signal,
   });
 
   if (!response.ok) {
@@ -55,6 +57,7 @@ export async function summarizeVideoStream(
   const decoder = new TextDecoder();
   let buffer = "";
   let streamCompleted = false;
+  let sawDone = false;
 
   try {
     while (true) {
@@ -74,6 +77,9 @@ export async function summarizeVideoStream(
 
         const event = JSON.parse(line) as SummarizeStreamEvent;
         onEvent(event);
+        if (event.type === "done") {
+          sawDone = true;
+        }
         if (event.type === "error") {
           throw new Error(event.message);
         }
@@ -84,9 +90,16 @@ export async function summarizeVideoStream(
     if (buffer.trim()) {
       const event = JSON.parse(buffer) as SummarizeStreamEvent;
       onEvent(event);
+      if (event.type === "done") {
+        sawDone = true;
+      }
       if (event.type === "error") {
         throw new Error(event.message);
       }
+    }
+
+    if (!sawDone) {
+      throw new Error("Summary stream ended before completion");
     }
     streamCompleted = true;
   } finally {

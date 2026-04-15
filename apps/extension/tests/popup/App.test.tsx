@@ -112,6 +112,7 @@ describe("App", () => {
       "video-1",
       "token",
       expect.any(Function),
+      expect.any(AbortSignal),
     );
   });
 
