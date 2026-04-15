@@ -69,4 +69,9 @@ def get_allowed_emails() -> list[str]:
 
 def is_dev_login_enabled() -> bool:
     """Return whether the local dev-login route is enabled."""
-    return os.getenv("ENABLE_DEV_LOGIN", "").strip().lower() in {"1", "true", "yes", "on"}
+    return os.getenv("ENABLE_DEV_LOGIN", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }

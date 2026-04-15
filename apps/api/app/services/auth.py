@@ -134,9 +134,13 @@ class AuthService:
                 "Rejected Google sign-in for email=%s because it is not in ALLOWED_EMAILS",
                 identity.email,
             )
-            raise AuthorizationError("This Google account is not allowed to use the app.")
+            raise AuthorizationError(
+                "This Google account is not allowed to use the app."
+            )
 
-        logger.info("Authenticated Google user email=%s user_id=%s", user.email, user.id)
+        logger.info(
+            "Authenticated Google user email=%s user_id=%s", user.email, user.id
+        )
         return user
 
     def authenticate_dev_user(self, db: Session, email: str | None = None) -> User:
@@ -204,7 +208,9 @@ class AuthService:
 
         user = self.users_repository.get_by_id(db, user_id=user_id)
         if user is None:
-            logger.warning("App session token subject=%s did not map to a user", user_id)
+            logger.warning(
+                "App session token subject=%s did not map to a user", user_id
+            )
             raise AuthenticationError("Authenticated user was not found.")
 
         if not user.is_allowed:
@@ -212,7 +218,11 @@ class AuthService:
                 "Rejected app session for email=%s because the account is not allowed",
                 user.email,
             )
-            raise AuthorizationError("This account is no longer allowed to use the app.")
+            raise AuthorizationError(
+                "This account is no longer allowed to use the app."
+            )
 
-        logger.info("Authenticated app session for email=%s user_id=%s", user.email, user.id)
+        logger.info(
+            "Authenticated app session for email=%s user_id=%s", user.email, user.id
+        )
         return user

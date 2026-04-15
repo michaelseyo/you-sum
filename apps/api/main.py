@@ -1,4 +1,6 @@
+import json
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,8 +11,12 @@ from app.dependencies.auth import auth_service, get_current_user
 from app.helpers.auth import build_user_response
 from app.repositories.summaries_repository import SummariesRepository
 from app.repositories.transcripts_repository import TranscriptsRepository
-from app.schemas.auth import (AuthResponse, CurrentUserResponse,
-                              DevLoginRequest, GoogleAuthRequest)
+from app.schemas.auth import (
+    AuthResponse,
+    CurrentUserResponse,
+    DevLoginRequest,
+    GoogleAuthRequest,
+)
 from app.schemas.summarize import SummarizeRequest, SummarizeResponse
 from app.services.auth import AuthenticationError, AuthorizationError
 from app.services.summarize_orchestrator import SummarizeOrchestrator
@@ -18,6 +24,7 @@ from app.services.summary import SummaryService
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from openai import APIStatusError, RateLimitError
 from sqlalchemy.orm import Session
 
@@ -112,8 +119,62 @@ if auth_service.dev_login_enabled:
 
 @app.get("/me", response_model=CurrentUserResponse)
 async def me(current_user=Depends(get_current_user)) -> CurrentUserResponse:
-    logger.info("Current user requested for email=%s user_id=%s", current_user.email, current_user.id)
+    logger.info(
+        "Current user requested for email=%s user_id=%s",
+        current_user.email,
+        current_user.id,
+    )
     return CurrentUserResponse(user=build_user_response(current_user))
+
+
+async def encode_stream_events(events) -> AsyncIterator[str]:
+    try:
+        async for event in events:
+            event_type = str(event["type"])
+            event_data = {key: value for key, value in event.items() if key != "type"}
+            # SSE uses the `event:` field for routing and the `data:` field for
+            # the JSON payload, so avoid duplicating `type` inside the payload.
+            yield (
+                f"event: {event_type}\n"
+                f"data: {json.dumps(event_data, separators=(',', ':'))}\n\n"
+            )
+    except RateLimitError:
+        logger.warning("OpenAI rate limit or quota issue during stream")
+        yield (
+            "event: error\n"
+            "data: "
+            + json.dumps(
+                {
+                    "message": "Summary generation is temporarily unavailable due to an OpenAI quota or rate limit issue.",
+                },
+                separators=(",", ":"),
+            )
+            + "\n\n"
+        )
+    except APIStatusError:
+        logger.exception("OpenAI API status error during stream")
+        yield (
+            "event: error\n"
+            "data: "
+            + json.dumps(
+                {
+                    "message": "Summary generation failed because the upstream AI service returned an error.",
+                },
+                separators=(",", ":"),
+            )
+            + "\n\n"
+        )
+    except Exception:
+        logger.exception("Unexpected summary stream failure")
+        yield (
+            "event: error\n"
+            "data: "
+            + json.dumps(
+                {"message": "Summary generation failed unexpectedly."},
+                separators=(",", ":"),
+            )
+            + "\n\n"
+        )
 
 
 @app.post("/summarize", response_model=SummarizeResponse)
@@ -162,4 +223,23 @@ async def summarize(
         summary=result.summary,
         cached=result.cached,
         prompt_version=result.prompt_version,
+    )
+
+
+@app.post("/summarize/stream")
+async def summarize_stream(
+    payload: SummarizeRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    logger.info(
+        "Summarize stream requested for video_id=%s by email=%s user_id=%s",
+        payload.video_id,
+        current_user.email,
+        current_user.id,
+    )
+    events = summarize_orchestrator.stream_summarize_video(db, payload.video_id)
+    return StreamingResponse(
+        encode_stream_events(events),
+        media_type="text/event-stream",
     )

@@ -17,3 +17,14 @@ class SummaryService:
         )
 
         return response.output_text
+
+    async def stream_summary_transcript(self, transcript_text: str):
+        prompt = build_summary_prompt(transcript_text)
+        async with self.client.responses.stream(
+            model=self.model,
+            instructions=SUMMARY_INSTRUCTIONS,
+            input=prompt,
+        ) as stream:
+            async for event in stream:
+                if event.type == "response.output_text.delta":
+                    yield event.delta

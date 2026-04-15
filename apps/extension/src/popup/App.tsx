@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { summarizeVideo } from "../lib/api";
+import { useEffect, useRef, useState } from "react";
+import { summarizeVideoStream } from "../lib/api";
 import {
   getActiveTab,
   getVideoContext,
@@ -14,6 +14,10 @@ export function App() {
   );
   const [status, setStatus] = useState("Ready to summarize the current video.");
   const [result, setResult] = useState("No summary yet.");
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const summarizeAttemptRef = useRef(0);
+  const streamAbortRef = useRef<AbortController | null>(null);
 
   const signedIn = Boolean(authState?.accessToken);
 
@@ -38,6 +42,10 @@ export function App() {
       setAuthStatus(message);
       setAuthState(null);
     });
+
+    return () => {
+      streamAbortRef.current?.abort();
+    };
   }, []);
 
   async function handleSignIn() {
@@ -60,6 +68,10 @@ export function App() {
 
   async function handleSignOut() {
     try {
+      summarizeAttemptRef.current += 1;
+      streamAbortRef.current?.abort();
+      setIsSigningOut(true);
+      setIsSummarizing(false);
       const response = await sendRuntimeMessage({ type: "AUTH_SIGN_OUT" });
       if (!response.ok) {
         throw new Error(response.error || "Sign-out failed");
@@ -71,6 +83,8 @@ export function App() {
       setResult("No summary yet.");
     } catch (error: unknown) {
       setAuthStatus(error instanceof Error ? error.message : "Sign-out failed");
+    } finally {
+      setIsSigningOut(false);
     }
   }
 
@@ -79,9 +93,22 @@ export function App() {
       setStatus("Sign in before summarizing.");
       return;
     }
+    if (isSigningOut) {
+      return;
+    }
+    if (isSummarizing) {
+      return;
+    }
 
+    const attemptId = summarizeAttemptRef.current + 1;
+    summarizeAttemptRef.current = attemptId;
+    streamAbortRef.current?.abort();
+    const abortController = new AbortController();
+    streamAbortRef.current = abortController;
+    setIsSummarizing(true);
     setStatus("Reading current tab...");
     setResult("Loading...");
+    let receivedText = false;
 
     try {
       const tab = await getActiveTab();
@@ -97,14 +124,54 @@ export function App() {
       }
 
       setStatus(`Summarizing ${context.videoId}...`);
-      const data = await summarizeVideo(context.videoId, authState.accessToken);
-      setResult(data.summary);
-      setStatus("Summary loaded");
-    } catch (error: unknown) {
-      setStatus("Unable to summarize video");
-      setResult(
-        error instanceof Error ? error.message : "Unable to summarize video",
+      setResult("");
+      await summarizeVideoStream(
+        context.videoId,
+        authState.accessToken,
+        (event) => {
+          if (summarizeAttemptRef.current !== attemptId) {
+            return;
+          }
+
+          if (event.type === "status") {
+            setStatus(event.message);
+            return;
+          }
+
+          if (event.type === "delta") {
+            receivedText = true;
+            setResult((current) => current + event.text);
+            return;
+          }
+
+          if (event.type === "done") {
+            setStatus(event.cached ? "Cached summary loaded" : "Summary loaded");
+            return;
+          }
+
+          if (event.type === "error") {
+            setStatus("Unable to summarize video");
+          }
+        },
+        abortController.signal,
       );
+    } catch (error: unknown) {
+      if (summarizeAttemptRef.current !== attemptId) {
+        return;
+      }
+      setStatus("Unable to summarize video");
+      if (!receivedText) {
+        setResult(
+          error instanceof Error ? error.message : "Unable to summarize video",
+        );
+      }
+    } finally {
+      if (summarizeAttemptRef.current === attemptId) {
+        setIsSummarizing(false);
+      }
+      if (streamAbortRef.current === abortController) {
+        streamAbortRef.current = null;
+      }
     }
   }
 
@@ -120,12 +187,21 @@ export function App() {
           </button>
         ) : null}
         {signedIn ? (
-          <button className="secondary" onClick={handleSignOut} type="button">
+          <button
+            className="secondary"
+            disabled={isSigningOut}
+            onClick={handleSignOut}
+            type="button"
+          >
             Sign out
           </button>
         ) : null}
       </div>
-      <button disabled={!signedIn} onClick={handleSummarize} type="button">
+      <button
+        disabled={!signedIn || isSummarizing || isSigningOut}
+        onClick={handleSummarize}
+        type="button"
+      >
         Summarize this video
       </button>
       <pre>{result}</pre>

@@ -60,7 +60,9 @@ class AuthRoutesTestCase(unittest.TestCase):
                     },
                 )(),
             ):
-                response = client.post("/auth/google", json={"id_token": "google-token"})
+                response = client.post(
+                    "/auth/google", json={"id_token": "google-token"}
+                )
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
@@ -109,7 +111,9 @@ class AuthRoutesTestCase(unittest.TestCase):
                     },
                 )(),
             ):
-                response = client.post("/auth/google", json={"id_token": "google-token"})
+                response = client.post(
+                    "/auth/google", json={"id_token": "google-token"}
+                )
 
         self.assertEqual(response.status_code, 403)
 
@@ -147,6 +151,15 @@ class AuthRoutesTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 401)
 
+    def test_summarize_stream_rejects_missing_token(self) -> None:
+        temp_dir, main_module = load_main_module()
+        self.addCleanup(temp_dir.cleanup)
+
+        with TestClient(main_module.app) as client:
+            response = client.post("/summarize/stream", json={"video_id": "video-1"})
+
+        self.assertEqual(response.status_code, 401)
+
     def test_summarize_succeeds_with_valid_dev_token(self) -> None:
         temp_dir, main_module = load_main_module(enable_dev_login=True)
         self.addCleanup(temp_dir.cleanup)
@@ -179,3 +192,38 @@ class AuthRoutesTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["summary"], "cached summary")
         self.assertEqual(summarize_mock.await_count, 1)
+
+    def test_summarize_stream_succeeds_with_valid_dev_token(self) -> None:
+        temp_dir, main_module = load_main_module(enable_dev_login=True)
+        self.addCleanup(temp_dir.cleanup)
+
+        async def fake_stream(_db, _video_id):
+            yield {"type": "delta", "text": "hello"}
+            yield {"type": "done", "cached": False, "prompt_version": "v1"}
+
+        with TestClient(main_module.app) as client:
+            login_response = client.post("/auth/dev-login", json={})
+            access_token = login_response.json()["access_token"]
+
+            with patch.object(
+                main_module.summarize_orchestrator,
+                "stream_summarize_video",
+                fake_stream,
+            ):
+                response = client.post(
+                    "/summarize/stream",
+                    json={"video_id": "video-1"},
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers["content-type"], "text/event-stream; charset=utf-8"
+        )
+        self.assertEqual(
+            response.text,
+            "event: delta\n"
+            'data: {"text":"hello"}\n\n'
+            "event: done\n"
+            'data: {"cached":false,"prompt_version":"v1"}\n\n',
+        )
