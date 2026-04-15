@@ -5,6 +5,55 @@ type ApiErrorPayload = {
   detail?: string;
 };
 
+function parseSseFrame(frame: string): SummarizeStreamEvent | null {
+  let eventType = "";
+  const dataLines: string[] = [];
+
+  // SSE frames are line-based. Normalize CRLF so splitting works whether the
+  // server/proxy sends "\r\n" or "\n" line endings.
+  for (const line of frame.replace(/\r\n/g, "\n").split("\n")) {
+    if (!line || line.startsWith(":")) {
+      continue;
+    }
+
+    if (line.startsWith("event:")) {
+      eventType = line.slice("event:".length).trim();
+      continue;
+    }
+
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice("data:".length).trimStart());
+    }
+  }
+
+  if (!eventType || dataLines.length === 0) {
+    return null;
+  }
+
+  // The SSE event name carries our logical event type; the data payload only
+  // contains the fields for that event, mirroring OpenAI-style stream events.
+  return {
+    ...JSON.parse(dataLines.join("\n")),
+    type: eventType,
+  } as SummarizeStreamEvent;
+}
+
+function readSseEvents(buffer: string): {
+  events: SummarizeStreamEvent[];
+  remainder: string;
+} {
+  // Network chunks can split in the middle of an SSE frame, so keep the last
+  // partial frame in the buffer until the next read completes it.
+  const normalizedBuffer = buffer.replace(/\r\n/g, "\n");
+  const frames = normalizedBuffer.split("\n\n");
+  const remainder = frames.pop() || "";
+  const events = frames
+    .map((frame) => parseSseFrame(frame))
+    .filter((event): event is SummarizeStreamEvent => event !== null);
+
+  return { events, remainder };
+}
+
 export async function summarizeVideo(
   videoId: string,
   accessToken: string,
@@ -59,6 +108,16 @@ export async function summarizeVideoStream(
   let streamCompleted = false;
   let sawDone = false;
 
+  const handleEvent = (event: SummarizeStreamEvent) => {
+    onEvent(event);
+    if (event.type === "done") {
+      sawDone = true;
+    }
+    if (event.type === "error") {
+      throw new Error(event.message);
+    }
+  };
+
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -67,34 +126,19 @@ export async function summarizeVideoStream(
       }
 
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+      const { events, remainder } = readSseEvents(buffer);
+      buffer = remainder;
 
-      for (const line of lines) {
-        if (!line.trim()) {
-          continue;
-        }
-
-        const event = JSON.parse(line) as SummarizeStreamEvent;
-        onEvent(event);
-        if (event.type === "done") {
-          sawDone = true;
-        }
-        if (event.type === "error") {
-          throw new Error(event.message);
-        }
+      for (const event of events) {
+        handleEvent(event);
       }
     }
 
     buffer += decoder.decode();
     if (buffer.trim()) {
-      const event = JSON.parse(buffer) as SummarizeStreamEvent;
-      onEvent(event);
-      if (event.type === "done") {
-        sawDone = true;
-      }
-      if (event.type === "error") {
-        throw new Error(event.message);
+      const event = parseSseFrame(buffer);
+      if (event) {
+        handleEvent(event);
       }
     }
 
@@ -104,6 +148,8 @@ export async function summarizeVideoStream(
     streamCompleted = true;
   } finally {
     if (!streamCompleted) {
+      // Abort/error paths should release the stream promptly instead of leaving
+      // the browser to drain a response the UI no longer needs.
       await reader.cancel().catch(() => undefined);
     }
     reader.releaseLock();

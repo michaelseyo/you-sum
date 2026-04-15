@@ -130,39 +130,50 @@ async def me(current_user=Depends(get_current_user)) -> CurrentUserResponse:
 async def encode_stream_events(events) -> AsyncIterator[str]:
     try:
         async for event in events:
-            yield json.dumps(event, separators=(",", ":")) + "\n"
+            event_type = str(event["type"])
+            event_data = {key: value for key, value in event.items() if key != "type"}
+            # SSE uses the `event:` field for routing and the `data:` field for
+            # the JSON payload, so avoid duplicating `type` inside the payload.
+            yield (
+                f"event: {event_type}\n"
+                f"data: {json.dumps(event_data, separators=(',', ':'))}\n\n"
+            )
     except RateLimitError:
         logger.warning("OpenAI rate limit or quota issue during stream")
         yield (
-            json.dumps(
+            "event: error\n"
+            "data: "
+            + json.dumps(
                 {
-                    "type": "error",
                     "message": "Summary generation is temporarily unavailable due to an OpenAI quota or rate limit issue.",
                 },
                 separators=(",", ":"),
             )
-            + "\n"
+            + "\n\n"
         )
     except APIStatusError:
         logger.exception("OpenAI API status error during stream")
         yield (
-            json.dumps(
+            "event: error\n"
+            "data: "
+            + json.dumps(
                 {
-                    "type": "error",
                     "message": "Summary generation failed because the upstream AI service returned an error.",
                 },
                 separators=(",", ":"),
             )
-            + "\n"
+            + "\n\n"
         )
     except Exception:
         logger.exception("Unexpected summary stream failure")
         yield (
-            json.dumps(
-                {"type": "error", "message": "Summary generation failed unexpectedly."},
+            "event: error\n"
+            "data: "
+            + json.dumps(
+                {"message": "Summary generation failed unexpectedly."},
                 separators=(",", ":"),
             )
-            + "\n"
+            + "\n\n"
         )
 
 
@@ -230,5 +241,5 @@ async def summarize_stream(
     events = summarize_orchestrator.stream_summarize_video(db, payload.video_id)
     return StreamingResponse(
         encode_stream_events(events),
-        media_type="application/x-ndjson",
+        media_type="text/event-stream",
     )

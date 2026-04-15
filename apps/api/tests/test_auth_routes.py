@@ -217,9 +217,13 @@ class AuthRoutesTestCase(unittest.TestCase):
                 )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["content-type"], "application/x-ndjson")
+        self.assertEqual(
+            response.headers["content-type"], "text/event-stream; charset=utf-8"
+        )
         self.assertEqual(
             response.text,
-            '{"type":"delta","text":"hello"}\n'
-            '{"type":"done","cached":false,"prompt_version":"v1"}\n',
+            "event: delta\n"
+            'data: {"text":"hello"}\n\n'
+            "event: done\n"
+            'data: {"cached":false,"prompt_version":"v1"}\n\n',
         )
