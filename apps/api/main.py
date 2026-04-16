@@ -1,6 +1,4 @@
-import json
 import logging
-from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,14 +7,11 @@ from app.clients.openai_client import create_openai_client
 from app.config import get_allowed_origin_regex, get_allowed_origins
 from app.dependencies.auth import auth_service, get_current_user
 from app.helpers.auth import build_user_response
+from app.helpers.sse import encode_stream_events
 from app.repositories.summaries_repository import SummariesRepository
 from app.repositories.transcripts_repository import TranscriptsRepository
-from app.schemas.auth import (
-    AuthResponse,
-    CurrentUserResponse,
-    DevLoginRequest,
-    GoogleAuthRequest,
-)
+from app.schemas.auth import (AuthResponse, CurrentUserResponse,
+                              DevLoginRequest, GoogleAuthRequest)
 from app.schemas.summarize import SummarizeRequest, SummarizeResponse
 from app.services.auth import AuthenticationError, AuthorizationError
 from app.services.summarize_orchestrator import SummarizeOrchestrator
@@ -125,56 +120,6 @@ async def me(current_user=Depends(get_current_user)) -> CurrentUserResponse:
         current_user.id,
     )
     return CurrentUserResponse(user=build_user_response(current_user))
-
-
-async def encode_stream_events(events) -> AsyncIterator[str]:
-    try:
-        async for event in events:
-            event_type = str(event["type"])
-            event_data = {key: value for key, value in event.items() if key != "type"}
-            # SSE uses the `event:` field for routing and the `data:` field for
-            # the JSON payload, so avoid duplicating `type` inside the payload.
-            yield (
-                f"event: {event_type}\n"
-                f"data: {json.dumps(event_data, separators=(',', ':'))}\n\n"
-            )
-    except RateLimitError:
-        logger.warning("OpenAI rate limit or quota issue during stream")
-        yield (
-            "event: error\n"
-            "data: "
-            + json.dumps(
-                {
-                    "message": "Summary generation is temporarily unavailable due to an OpenAI quota or rate limit issue.",
-                },
-                separators=(",", ":"),
-            )
-            + "\n\n"
-        )
-    except APIStatusError:
-        logger.exception("OpenAI API status error during stream")
-        yield (
-            "event: error\n"
-            "data: "
-            + json.dumps(
-                {
-                    "message": "Summary generation failed because the upstream AI service returned an error.",
-                },
-                separators=(",", ":"),
-            )
-            + "\n\n"
-        )
-    except Exception:
-        logger.exception("Unexpected summary stream failure")
-        yield (
-            "event: error\n"
-            "data: "
-            + json.dumps(
-                {"message": "Summary generation failed unexpectedly."},
-                separators=(",", ":"),
-            )
-            + "\n\n"
-        )
 
 
 @app.post("/summarize", response_model=SummarizeResponse)
