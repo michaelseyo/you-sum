@@ -117,6 +117,38 @@ class AuthRoutesTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_me_accepts_token(self) -> None:
+        temp_dir, main_module = load_main_module()
+        self.addCleanup(temp_dir.cleanup)
+        self.addCleanup(main_module.app.dependency_overrides.clear)
+
+        def make_user():
+            return type(
+                "User",
+                (),
+                {
+                    "id": "1",
+                    "google_sub": "google-sub-1",
+                    "email": "user@example.com",
+                    "name": "User One",
+                    "picture_url": "https://example.com/avatar.png",
+                    "is_allowed": True,
+                },
+            )
+
+        main_module.app.dependency_overrides[main_module.get_current_user] = make_user()
+
+        with TestClient(main_module.app) as client:
+            response = client.get("/me")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["email"], "user@example.com")
+        self.assertEqual(response.json()["user"]["name"], "User One")
+        self.assertEqual(
+            response.json()["user"]["picture_url"], "https://example.com/avatar.png"
+        )
+        self.assertTrue(response.json()["user"]["is_allowed"])
+
     def test_me_rejects_missing_token(self) -> None:
         temp_dir, main_module = load_main_module()
         self.addCleanup(temp_dir.cleanup)
