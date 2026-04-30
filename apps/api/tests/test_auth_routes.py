@@ -3,13 +3,36 @@ import os
 import sys
 import tempfile
 import unittest
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from types import ModuleType
 from unittest.mock import AsyncMock, patch
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 
-def load_main_module(*, enable_dev_login: bool = False):
+@dataclass
+class FakeIdentity:
+    google_sub: str = "google-sub-1"
+    email: str = "user@example.com"
+    name: str | None = "User One"
+    picture_url: str | None = "https://example.com/avatar.png"
+
+
+@dataclass
+class FakeUser:
+    id: str = "1"
+    google_sub: str = "google-sub-1"
+    email: str = "user@example.com"
+    name: str | None = "User One"
+    picture_url: str | None = "https://example.com/avatar.png"
+    is_allowed: bool = True
+
+
+def load_main_module(
+    *, enable_dev_login: bool = False
+) -> tuple[tempfile.TemporaryDirectory[str], ModuleType]:
     temp_dir = tempfile.TemporaryDirectory()
     os.environ["DATABASE_URL"] = f"sqlite:///{temp_dir.name}/app.db"
     os.environ["OPENAI_API_KEY"] = "test-openai-key"
@@ -23,6 +46,40 @@ def load_main_module(*, enable_dev_login: bool = False):
     sys.modules.pop("main", None)
     module = importlib.import_module("main")
     return temp_dir, module
+
+
+def make_identity(
+    *,
+    google_sub: str = "google-sub-1",
+    email: str = "user@example.com",
+    name: str | None = "User One",
+    picture_url: str | None = "https://example.com/avatar.png",
+) -> FakeIdentity:
+    return FakeIdentity(
+        google_sub=google_sub,
+        email=email,
+        name=name,
+        picture_url=picture_url,
+    )
+
+
+def make_user(
+    *,
+    id: str = "1",
+    google_sub: str = "google-sub-1",
+    email: str = "user@example.com",
+    name: str | None = "User One",
+    picture_url: str | None = "https://example.com/avatar.png",
+    is_allowed: bool = True,
+) -> FakeUser:
+    return FakeUser(
+        id=id,
+        google_sub=google_sub,
+        email=email,
+        name=name,
+        picture_url=picture_url,
+        is_allowed=is_allowed,
+    )
 
 
 class AuthRoutesTestCase(unittest.TestCase):
@@ -49,16 +106,7 @@ class AuthRoutesTestCase(unittest.TestCase):
             with patch.object(
                 main_module.auth_service,
                 "verify_google_id_token",
-                return_value=type(
-                    "Identity",
-                    (),
-                    {
-                        "google_sub": "google-sub-1",
-                        "email": "user@example.com",
-                        "name": "User One",
-                        "picture_url": "https://example.com/avatar.png",
-                    },
-                )(),
+                return_value=make_identity(),
             ):
                 response = client.post(
                     "/auth/google", json={"id_token": "google-token"}
@@ -100,16 +148,12 @@ class AuthRoutesTestCase(unittest.TestCase):
             with patch.object(
                 main_module.auth_service,
                 "verify_google_id_token",
-                return_value=type(
-                    "Identity",
-                    (),
-                    {
-                        "google_sub": "google-sub-2",
-                        "email": "other@example.com",
-                        "name": None,
-                        "picture_url": None,
-                    },
-                )(),
+                return_value=make_identity(
+                    google_sub="google-sub-2",
+                    email="other@example.com",
+                    name=None,
+                    picture_url=None,
+                ),
             ):
                 response = client.post(
                     "/auth/google", json={"id_token": "google-token"}
@@ -120,25 +164,15 @@ class AuthRoutesTestCase(unittest.TestCase):
     def test_me_accepts_token(self) -> None:
         temp_dir, main_module = load_main_module()
         self.addCleanup(temp_dir.cleanup)
-        self.addCleanup(main_module.app.dependency_overrides.clear)
+        app: FastAPI = main_module.app
+        self.addCleanup(app.dependency_overrides.clear)
 
-        def make_user():
-            return type(
-                "User",
-                (),
-                {
-                    "id": "1",
-                    "google_sub": "google-sub-1",
-                    "email": "user@example.com",
-                    "name": "User One",
-                    "picture_url": "https://example.com/avatar.png",
-                    "is_allowed": True,
-                },
-            )
+        async def fake_get_current_user() -> FakeUser:
+            return make_user()
 
-        main_module.app.dependency_overrides[main_module.get_current_user] = make_user()
+        app.dependency_overrides[main_module.get_current_user] = fake_get_current_user
 
-        with TestClient(main_module.app) as client:
+        with TestClient(app) as client:
             response = client.get("/me")
 
         self.assertEqual(response.status_code, 200)
